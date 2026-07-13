@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if product else 'Add' }} Product - Admin{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('admin_dashboard') }}">Dashboard</a> > Products > {{ 'Edit' if product else 'Add' }} Product{% endblock %}
+{% block content %}
+<div class="admin-page">
+    <h1>{{ 'Edit' if product else 'Add' }} Product</h1>
+    <p><a href="{{ url_for('admin_products') }}" class="btn btn-secondary btn-sm">← Back to Products</a></p>
+    <form method="POST" enctype="multipart/form-data" class="login-form" style="max-width: 500px;">
+        <div class="form-group">
+            <label>Product Name *</label>
+            <input type="text" name="name" value="{{ product.name if product else '' }}" required>
+        </div>
+        <div class="form-group">
+            <label>Price *</label>
+            <input type="number" name="price" step="0.01" value="{{ product.price if product else '' }}" required>
+        </div>
+        <div class="form-group">
+            <label>Category</label>
+            <select name="category_id">
+                <option value="">— None —</option>
+                {% for c in categories %}
+                <option value="{{ c.id }}" {% if product and product.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Description</label>
+            <textarea name="description" rows="3">{{ product.description if product else '' }}</textarea>
+        </div>
+        <div class="form-group">
+            <label>Stock Quantity (leave empty for unlimited)</label>
+            <input type="number" name="stock_quantity" min="0" value="{{ product.stock_quantity if product and product.stock_quantity is not none else '' }}" placeholder="Unlimited">
+        </div>
+        <div class="form-group">
+            <label>SKU</label>
+            <input type="text" name="sku" value="{{ product.sku if product else '' }}">
+        </div>
+        <div class="form-group">
+            <label>Weight (kg)</label>
+            <input type="number" name="weight" step="0.01" value="{{ product.weight if product else '' }}">
+        </div>
+        <div class="form-group">
+            <label>Dimensions</label>
+            <input type="text" name="dimensions" value="{{ product.dimensions if product else '' }}" placeholder="e.g. 10x20x5 cm">
+        </div>
+        <div class="form-group">
+            <label>Product Image</label>
+            {% if product and product.image_url %}
+            <p><img src="{{ product.image_url }}" alt="" style="max-height: 100px; margin-bottom: 0.5rem;"></p>
+            {% endif %}
+            <input type="file" name="image" accept="image/*">
+        </div>
+        <button type="submit" class="btn btn-primary">Save Product</button>
+    </form>
+</div>
+{% endblock %}

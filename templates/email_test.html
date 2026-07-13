@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Email Test - Abound Next-Gen E-Hub{% endblock %}
+{% block breadcrumb %}{% if is_admin %}<a href="{{ url_for('admin_dashboard') }}">Dashboard</a> > System > Email Test{% elif current_user %}<a href="{{ url_for('dashboard') }}">Dashboard</a> > Email Test{% endif %}{% endblock %}
+{% block content %}
+<div class="email-test-page">
+    <h1>Email Troubleshooting</h1>
+    
+    <div class="config-status">
+        <h2>Configuration</h2>
+        <table class="config-table">
+            <tr><td>MAIL_SERVER</td><td>{{ mail_server or '(not set)' }}</td></tr>
+            <tr><td>MAIL_PORT</td><td>{{ mail_port or '(not set)' }}</td></tr>
+            <tr><td>MAIL_USERNAME</td><td>{{ mail_username or '(not set)' }}</td></tr>
+            <tr><td>MAIL_PASSWORD</td><td>{% if config_ok %}✓ Set{% else %}✗ Not set{% endif %}</td></tr>
+            <tr><td>Status</td><td>{% if config_ok %}<span class="status-ok">Configured</span>{% else %}<span class="status-error">Not configured</span>{% endif %}</td></tr>
+        </table>
+        <p class="config-note">Will send to: <strong>{{ user.email }}</strong></p>
+    </div>
+    
+    {% if error_msg %}
+    <div class="error-box">
+        <h3>Error</h3>
+        <pre>{{ error_msg }}</pre>
+    </div>
+    {% endif %}
+    
+    {% if success %}
+    <div class="success-box">
+        <h3>✓ Email sent successfully</h3>
+        <p>Check {{ user.email }} (and spam folder).</p>
+    </div>
+    {% endif %}
+    
+    <form method="POST" class="test-form">
+        <button type="submit" class="btn btn-primary" {% if not config_ok %}disabled title="Configure email first"{% endif %}>
+            Send test welcome email
+        </button>
+    </form>
+    
+    <div class="troubleshoot-tips">
+        <h3>Common fixes</h3>
+        <ul>
+            <li><strong>Gmail:</strong> Use an <a href="https://myaccount.google.com/apppasswords" target="_blank">App Password</a>, not your regular password. Enable 2-Step Verification first.</li>
+            <li><strong>.env file:</strong> Create it in the project root (same folder as app.py). Restart the app after editing.</li>
+            <li><strong>Format:</strong> <code>MAIL_USERNAME=yourmail@gmail.com</code> and <code>MAIL_PASSWORD=xxxx xxxx xxxx xxxx</code></li>
+            <li><strong>Firewall:</strong> Port 587 must be allowed for outbound SMTP.</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

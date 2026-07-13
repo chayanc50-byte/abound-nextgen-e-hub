@@ -1,0 +1,90 @@
+{% extends "base_public.html" %}
+
+{% block title %}Message from the Director - Abound Next-Gen E-Hub{% endblock %}
+
+{% block content %}
+<!-- Hero Header -->
+<section class="dm-hero">
+    <div class="dm-hero-content">
+        <h1>Message from the Director</h1>
+        <p class="dm-hero-subtitle">A warm welcome from our leadership</p>
+    </div>
+</section>
+
+<!-- Navigation Links (Top) -->
+<nav class="dm-nav">
+    <a href="{{ url_for('index') }}" class="dm-nav-link">Home</a>
+    <a href="{{ url_for('about') }}" class="dm-nav-link">About Us</a>
+    <a href="{{ url_for('contact') }}" class="dm-nav-link">Contact Us</a>
+    <a href="{{ url_for('faq') }}" class="dm-nav-link">FAQ</a>
+</nav>
+
+<!-- Main Container -->
+<div class="dm-container">
+    <!-- Director Profile Card -->
+    <div class="dm-director-card">
+        {% if director_profile_url %}
+        <div class="dm-director-photo-wrap">
+            <img src="{{ director_profile_url }}" alt="Baidyanath Mahanta" class="dm-director-pic" id="dmDirectorPhoto">
+            <a href="https://www.facebook.com/baidyanath.mahanta.5/" target="_blank" rel="noopener noreferrer" class="dm-director-fb-icon" id="dmFbIcon" aria-label="Facebook profile">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+            </a>
+        </div>
+        {% else %}
+        <div class="dm-director-placeholder">Director Photo</div>
+        {% endif %}
+        <h2 class="dm-director-name">Baidyanath Mahanta</h2>
+        <p class="dm-director-title">Director</p>
+    </div>
+
+    <!-- Message Letter Card -->
+    <div class="dm-message-card">
+        <div class="dm-letter-content">
+            <p>Dear Members and Visitors,</p>
+
+            <p>It gives me great pleasure to welcome you to Abound NextGen E Hub.</p>
+
+            <p>Our vision is to build a powerful digital ecosystem where entrepreneurship, innovation, and community growth come together. We believe that every individual deserves an opportunity to grow financially and professionally in today's digital world.</p>
+
+            <p>Abound NextGen E Hub combines the strength of e-commerce with the power of network marketing to create a platform where people can build sustainable income and meaningful connections. Our goal is not only to provide quality products but also to empower individuals to become independent business leaders.</p>
+
+            <p>I invite you to join us on this journey of growth, collaboration, and success.</p>
+
+            <p>Together, we can build a stronger future.</p>
+
+            <p class="dm-letter-closing">Warm regards,</p>
+
+            <p class="dm-letter-signature-name">Baidyanath Mahanta<br>Director<br>Abound NextGen E Hub</p>
+
+            {% if director_signature_url %}
+            <img src="{{ director_signature_url }}" alt="Director Signature" class="dm-signature-img">
+            {% else %}
+            <p class="dm-signature-placeholder">Add director-signature.png to static/images/ to display signature</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Navigation Links (Bottom) -->
+    <div class="dm-nav-links">
+        <a href="{{ url_for('index') }}" class="btn">Home</a>
+        <a href="{{ url_for('about') }}" class="btn">About Us</a>
+        <a href="{{ url_for('contact') }}" class="btn">Contact Us</a>
+        <a href="{{ url_for('faq') }}" class="btn">FAQ</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var photo = document.getElementById('dmDirectorPhoto');
+    var fbIcon = document.getElementById('dmFbIcon');
+    if (photo && fbIcon) {
+        photo.addEventListener('click', function() {
+            fbIcon.classList.toggle('is-visible');
+        });
+    }
+});
+</script>
+{% endblock %}

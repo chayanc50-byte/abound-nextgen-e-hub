@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Admin - Abound Next-Gen E-Hub{% endblock %}
+
+{% block content %}
+<div class="admin-page">
+    <h1>Admin Dashboard</h1>
+    {% if can_create_first_sales %}
+    <div class="admin-banner">
+        <p>No sales users yet. <a href="{{ url_for('create_first_sales_user') }}" class="btn btn-primary">Create First Sales User</a> (root of the referral pyramid)</p>
+    </div>
+    {% endif %}
+    <div class="admin-nav">
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary btn-sm">Dashboard</a>
+        <a href="{{ url_for('admin_users') }}" class="btn btn-secondary btn-sm">Users</a>
+        <a href="{{ url_for('admin_commissions') }}" class="btn btn-secondary btn-sm">Commissions</a>
+        <a href="{{ url_for('admin_orders') }}" class="btn btn-secondary btn-sm">Orders</a>
+    </div>
+    <div class="admin-actions">
+        <form class="search-form" onsubmit="searchByRef(event)">
+            <input type="text" name="ref" placeholder="Search by Referral ID" class="search-input">
+            <button type="submit" class="btn btn-primary">Search</button>
+        </form>
+        <div id="search-result" class="search-result"></div>
+    </div>
+    <h2>All Users</h2>
+    <div class="table-responsive">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Username</th>
+                <th>Referral ID</th>
+                <th>Level</th>
+                <th>Team Size</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in users %}
+            <tr>
+                <td>{{ u.id }}</td>
+                <td>{{ u.full_name }}</td>
+                <td>{{ u.username }}</td>
+                <td>{{ u.referral_id or '—' }}</td>
+                <td><span class="badge">{{ u.level_name }}</span></td>
+                <td>{{ u.get_all_descendants()|length }}</td>
+                <td><a href="{{ url_for('admin_user', user_id=u.id) }}" class="btn btn-secondary btn-sm">Edit</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+<script>
+async function searchByRef(e) {
+    e.preventDefault();
+    const ref = e.target.ref.value.trim().toUpperCase();
+    const r = await fetch('/admin/search?ref=' + encodeURIComponent(ref));
+    const d = await r.json();
+    const el = document.getElementById('search-result');
+    if (d.found && d.user) {
+        el.innerHTML = '<div class="found">Found: ' + d.user.full_name + ' (Level: ' + d.user.level + ', Team: ' + d.user.team_size + ') <a href="/admin/user/' + d.user.id + '">View</a></div>';
+    } else {
+        el.innerHTML = '<div class="not-found">No user with referral ID: ' + ref + '</div>';
+    }
+}
+</script>
+{% endblock %}

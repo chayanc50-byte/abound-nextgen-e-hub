@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}Reassign User - Admin{% endblock %}
+{% block topbar_title %}Reassign User{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('admin_dashboard') }}">Dashboard</a> > Reassign User{% endblock %}
+{% block content %}
+<div class="admin-page">
+    <h1>Downline Reassignment</h1>
+    <p class="muted">Move a sales user to a different sponsor in the referral tree.</p>
+
+    <div id="reassign-message" class="alert-message" style="display:none; margin-bottom: 1rem;"></div>
+
+    <div class="card reassign-card">
+        <h3>Reassign User</h3>
+        <form id="reassign-form" class="reassign-form">
+            <div class="form-group">
+                <label for="user-to-move">User to Move</label>
+                <div class="searchable-dropdown">
+                    <input type="text" id="user-to-move-input" class="form-control" placeholder="Search by name, email, or referral ID..." autocomplete="off">
+                    <input type="hidden" id="user-to-move-id" name="user_id">
+                    <div id="user-to-move-results" class="dropdown-results"></div>
+                </div>
+                <div id="user-to-move-selected" class="selected-item" style="display:none;"></div>
+            </div>
+            <div class="form-group">
+                <label for="new-sponsor-input">New Sponsor</label>
+                <div class="searchable-dropdown">
+                    <input type="text" id="new-sponsor-input" class="form-control" placeholder="Search by name, email, or referral ID..." autocomplete="off">
+                    <input type="hidden" id="new-sponsor-id" name="new_parent_id">
+                    <div id="new-sponsor-results" class="dropdown-results"></div>
+                </div>
+                <div id="new-sponsor-selected" class="selected-item" style="display:none;"></div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" id="reassign-btn">Reassign User</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    const presetUserId = {{ preset_user_id or 'null' }};
+    let searchTimeout;
+
+    function showMsg(msg, isError) {
+        const el = document.getElementById('reassign-message');
+        el.textContent = msg;
+        el.className = 'alert-message ' + (isError ? 'alert-error' : 'alert-success');
+        el.style.display = 'block';
+        setTimeout(function() { el.style.display = 'none'; }, 6000);
+    }
+
+    function searchUsers(q, callback) {
+        if (!q || q.length < 2) { callback([]); return; }
+        fetch('/admin/api/search-users?q=' + encodeURIComponent(q))
+            .then(function(r) { return r.json(); })
+            .then(function(d) { callback(d.users || []); })
+            .catch(function() { callback([]); });
+    }
+
+    function setupSearchable(inputId, resultsId, hiddenId, selectedId, excludeId) {
+        const input = document.getElementById(inputId);
+        const results = document.getElementById(resultsId);
+        const hidden = document.getElementById(hiddenId);
+        const selected = document.getElementById(selectedId);
+
+        function renderResults(users) {
+            const exclude = excludeId ? (parseInt(document.getElementById(excludeId).value) || 0) : 0;
+            const filtered = users.filter(function(u) { return u.id !== exclude; });
+            if (filtered.length === 0) {
+                results.innerHTML = '<div class="dropdown-item muted">No users found</div>';
+            } else {
+                results.innerHTML = filtered.map(function(u) {
+                    return '<div class="dropdown-item" data-id="' + u.id + '" data-name="' + (u.full_name || '').replace(/"/g, '&quot;') + '" data-ref="' + (u.referral_id || '') + '">' +
+                        u.full_name + ' <span class="muted">(' + (u.referral_id || u.email) + ')</span></div>';
+                }).join('');
+            }
+            results.style.display = 'block';
+        }
+
+        function selectUser(id, name, ref) {
+            hidden.value = id;
+            selected.innerHTML = '<strong>' + (name || '') + '</strong>' + (ref ? ' <code>' + ref + '</code>' : '') + ' <a href="#" onclick="return false;" class="clear-selection">✕ Clear</a>';
+            selected.style.display = 'block';
+            input.style.display = 'none';
+            results.style.display = 'none';
+            input.value = '';
+            selected.querySelector('.clear-selection').onclick = function() {
+                hidden.value = '';
+                selected.style.display = 'none';
+                input.style.display = 'block';
+                input.focus();
+            };
+        }
+
+        input.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const q = input.value.trim();
+            if (q.length < 2) {
+                results.style.display = 'none';
+                return;
+            }
+            searchTimeout = setTimeout(function() {
+                searchUsers(q, renderResults);
+            }, 250);
+        });
+
+        input.addEventListener('focus', function() {
+            if (input.value.trim().length >= 2) searchUsers(input.value.trim(), renderResults);
+        });
+
+        results.addEventListener('click', function(e) {
+            const item = e.target.closest('.dropdown-item[data-id]');
+            if (item) {
+                selectUser(parseInt(item.dataset.id), item.dataset.name, item.dataset.ref);
+            }
+        });
+
+        document.addEventListener('click', function() {
+            setTimeout(function() { results.style.display = 'none'; }, 150);
+        });
+        input.addEventListener('click', function(e) { e.stopPropagation(); });
+        results.addEventListener('click', function(e) { e.stopPropagation(); });
+    }
+
+    setupSearchable('user-to-move-input', 'user-to-move-results', 'user-to-move-id', 'user-to-move-selected', null);
+    setupSearchable('new-sponsor-input', 'new-sponsor-results', 'new-sponsor-id', 'new-sponsor-selected', 'user-to-move-id');
+
+    if (presetUserId) {
+        fetch('/admin/api/search-users?q=' + presetUserId)
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                var u = (d.users || []).find(function(x) { return x.id === presetUserId; });
+                if (u) {
+                    var hidden = document.getElementById('user-to-move-id');
+                    var selected = document.getElementById('user-to-move-selected');
+                    var input = document.getElementById('user-to-move-input');
+                    var results = document.getElementById('user-to-move-results');
+                    hidden.value = u.id;
+                    selected.innerHTML = '<strong>' + (u.full_name || '') + '</strong>' + (u.referral_id ? ' <code>' + u.referral_id + '</code>' : '') + ' <a href="#" class="clear-selection">✕ Clear</a>';
+                    selected.style.display = 'block';
+                    input.style.display = 'none';
+                    selected.querySelector('.clear-selection').onclick = function(e) {
+                        e.preventDefault();
+                        hidden.value = '';
+                        selected.style.display = 'none';
+                        input.style.display = 'block';
+                        input.focus();
+                    };
+                }
+            });
+    }
+
+    document.getElementById('reassign-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const userId = document.getElementById('user-to-move-id').value;
+        const newParentId = document.getElementById('new-sponsor-id').value;
+        if (!userId || !newParentId) {
+            showMsg('Please select both user and new sponsor.', true);
+            return;
+        }
+        const btn = document.getElementById('reassign-btn');
+        btn.disabled = true;
+        btn.textContent = 'Reassigning...';
+        fetch('/admin/reassign-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ user_id: parseInt(userId), new_parent_id: parseInt(newParentId) })
+        })
+        .then(function(r) { return r.json().catch(function() { return {}; }); })
+        .then(function(d) {
+            if (d.status === 'success') {
+                showMsg(d.message, false);
+                document.getElementById('user-to-move-id').value = '';
+                document.getElementById('user-to-move-selected').style.display = 'none';
+                document.getElementById('user-to-move-input').style.display = 'block';
+                document.getElementById('new-sponsor-id').value = '';
+                document.getElementById('new-sponsor-selected').style.display = 'none';
+                document.getElementById('new-sponsor-input').style.display = 'block';
+            } else {
+                showMsg(d.message || 'Reassignment failed.', true);
+            }
+        })
+        .catch(function() { showMsg('Request failed. Please try again.', true); })
+        .finally(function() {
+            btn.disabled = false;
+            btn.textContent = 'Reassign User';
+        });
+    });
+})();
+</script>
+{% endblock %}

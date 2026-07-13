@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#ff7a00">
+    <title>{% block title %}Abound Next-Gen E-Hub{% endblock %}</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/icon-192.png') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="public-page {% block body_class %}{% endblock %}">
+    <header class="public-header">
+        <div class="header-container">
+            <div class="header-left">
+                <button type="button" class="header-hamburger" id="publicHamburger" aria-label="Open menu">
+                    <span class="hamburger-icon">☰</span>
+                </button>
+                <a href="{{ url_for('index') }}" class="header-brand">
+                    {% if logo_url %}<img src="{{ logo_url }}" alt="Abound Next-Gen E-Hub" class="header-logo">{% endif %}
+                    <span class="header-brand-text">Abound Next-Gen E-Hub</span>
+                </a>
+            </div>
+            <nav class="header-nav">
+                <a href="{{ url_for('index') }}" class="header-link">Home</a>
+                <a href="{{ url_for('catalog') }}" class="header-link">Products</a>
+                <a href="{{ url_for('index') }}#categories" class="header-link">Categories</a>
+                <a href="{{ url_for('about') }}" class="header-link">About</a>
+                <a href="{{ url_for('contact') }}" class="header-link">Contact</a>
+                <a href="{{ url_for('faq') }}" class="header-link">FAQ</a>
+                <a href="{{ url_for('register') }}" class="header-link">Join Us</a>
+            </nav>
+            <div class="header-actions">
+                <a href="{{ url_for('login') }}" class="btn btn-outline btn-sm">Login</a>
+                <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm">Register</a>
+                <a href="{{ url_for('catalog') }}" class="header-cart" aria-label="Cart" title="View Products">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Public sidebar menu -->
+    <div class="public-sidebar-overlay" id="publicSidebarOverlay" aria-hidden="true"></div>
+    <nav class="public-sidebar" id="publicSidebar" aria-label="Main navigation">
+        <a href="{{ url_for('index') }}" class="public-sidebar-link">Home</a>
+        <a href="{{ url_for('catalog') }}" class="public-sidebar-link">Products</a>
+        <a href="{{ url_for('index') }}#categories" class="public-sidebar-link">Categories</a>
+        <a href="{{ url_for('about') }}" class="public-sidebar-link">About</a>
+        <a href="{{ url_for('contact') }}" class="public-sidebar-link">Contact</a>
+        <a href="{{ url_for('faq') }}" class="public-sidebar-link">FAQ</a>
+        <a href="{{ url_for('register') }}" class="public-sidebar-link">Join Us</a>
+        <div class="public-sidebar-divider"></div>
+        <a href="{{ url_for('login') }}" class="public-sidebar-link">Login</a>
+        <a href="{{ url_for('register') }}" class="public-sidebar-link">Register</a>
+    </nav>
+
+    <main>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages container">
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="public-footer">
+        <div class="footer-container">
+            <div class="footer-grid">
+                <div class="footer-col">
+                    <h4>Company</h4>
+                    <a href="{{ url_for('about') }}">About</a>
+                    <a href="{{ url_for('director_message') }}">Director Message</a>
+                    <a href="{{ url_for('contact') }}">Contact</a>
+                    <a href="{{ url_for('faq') }}">FAQ</a>
+                </div>
+                <div class="footer-col">
+                    <h4>Products</h4>
+                    <a href="{{ url_for('catalog') }}">Categories</a>
+                    <a href="{{ url_for('catalog') }}">Featured</a>
+                </div>
+                <div class="footer-col">
+                    <h4>Account</h4>
+                    <a href="{{ url_for('login') }}">Login</a>
+                    <a href="{{ url_for('register') }}">Register</a>
+                </div>
+            </div>
+            <p class="footer-copy">© 2026 Abound Next-Gen E-Hub. An Abound Entertainment Venture.</p>
+        </div>
+    </footer>
+
+    <!-- PWA Install Banner -->
+    <div id="pwa-install-banner" class="pwa-install-banner" style="display:none;" aria-hidden="true">
+        <div class="pwa-install-content">
+            <span class="pwa-install-text">Install Abound NextGen E Hub</span>
+            <div class="pwa-install-actions">
+                <button type="button" class="pwa-install-btn" id="pwa-install-btn">Install</button>
+                <button type="button" class="pwa-install-dismiss" id="pwa-install-dismiss" aria-label="Dismiss">&times;</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/pwa.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

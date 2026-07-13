@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Admin - Abound Next-Gen E-Hub{% endblock %}
+{% block topbar_title %}Dashboard{% endblock %}
+{% block breadcrumb %}Dashboard{% endblock %}
+{% block content %}
+<div class="admin-page">
+    <h1>Admin Dashboard</h1>
+    <div class="admin-stats">
+        <div class="stat-box"><h3>{{ total_orders }}</h3><p>Total Orders</p></div>
+        <div class="stat-box"><h3>{{ pending_orders }}</h3><p>Pending Orders</p></div>
+        <div class="stat-box"><h3>{{ total_products }}</h3><p>Total Products</p></div>
+        <div class="stat-box"><h3>{{ low_stock }}</h3><p>Low Stock</p></div>
+    </div>
+    <p style="margin-top: 1rem;">
+        <a href="{{ url_for('admin_orders') }}" class="btn btn-primary">View Orders</a>
+        <a href="{{ url_for('admin_products') }}" class="btn btn-secondary" style="margin-left: 0.5rem;">Manage Products</a>
+    </p>
+</div>
+{% endblock %}

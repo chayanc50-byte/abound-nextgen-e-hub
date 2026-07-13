@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Tree Health - Super Admin{% endblock %}
+{% block topbar_title %}Tree Integrity{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('admin_dashboard') }}">Dashboard</a> > Tree Health{% endblock %}
+{% block content %}
+<div class="admin-page">
+    <h1>Tree Integrity Checker</h1>
+    <p class="muted">Scans the MLM referral structure for orphan users, circular references, duplicate referral IDs, and admin users incorrectly placed in the tree.</p>
+
+    <div id="fix-message" class="alert-message" style="display:none; margin-bottom: 1rem;"></div>
+
+    {% if not issues %}
+    <div class="tree-health-ok">
+        <p><strong>✓ No issues found.</strong> The referral tree structure is healthy.</p>
+    </div>
+    {% else %}
+    <p><strong>{{ issues|length }}</strong> issue(s) detected.</p>
+    <div class="table-responsive">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>User ID</th>
+                    <th>User Name</th>
+                    <th>Problem Type</th>
+                    <th>Suggested Fix</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for i in issues %}
+                <tr id="issue-row-{{ loop.index }}">
+                    <td>{{ i.user_id }}</td>
+                    <td>{{ i.user_name }}</td>
+                    <td><span class="badge badge-warning">{{ i.problem_type }}</span></td>
+                    <td>{{ i.suggested_fix }}</td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-primary fix-btn"
+                            data-user-id="{{ i.user_id }}"
+                            data-fix-action="{{ i.fix_action }}"
+                            data-row-id="issue-row-{{ loop.index }}">
+                            Fix
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    function showMsg(msg, isError) {
+        var el = document.getElementById('fix-message');
+        if (!el) return;
+        el.textContent = msg;
+        el.className = 'alert-message ' + (isError ? 'alert-error' : 'alert-success');
+        el.style.display = 'block';
+        setTimeout(function() { el.style.display = 'none'; }, 5000);
+    }
+
+    document.querySelectorAll('.fix-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var userId = this.dataset.userId;
+            var fixAction = this.dataset.fixAction;
+            var rowId = this.dataset.rowId;
+            var self = this;
+
+            self.disabled = true;
+            self.textContent = 'Fixing...';
+
+            fetch('/admin/tree-health/fix', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ user_id: parseInt(userId), fix_action: fixAction })
+            })
+            .then(function(r) { return r.json().catch(function() { return {}; }); })
+            .then(function(d) {
+                if (d.status === 'success') {
+                    showMsg(d.message, false);
+                    var row = document.getElementById(rowId);
+                    if (row) row.remove();
+                } else {
+                    showMsg(d.message || 'Fix failed.', true);
+                    self.disabled = false;
+                    self.textContent = 'Fix';
+                }
+            })
+            .catch(function() {
+                showMsg('Request failed. Please try again.', true);
+                self.disabled = false;
+                self.textContent = 'Fix';
+            });
+        });
+    });
+})();
+</script>
+{% endblock %}

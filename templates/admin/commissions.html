@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Admin Commissions - Abound Next-Gen E-Hub{% endblock %}
+{% block topbar_title %}Commissions{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('admin_dashboard') }}">Dashboard</a> > Commissions{% endblock %}
+{% block content %}
+<div class="admin-page">
+    <h1>Commissions</h1>
+    <p><a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary btn-sm">← Back to Dashboard</a></p>
+    <p><strong>Total Commissions:</strong> ₹{{ "%.2f"|format(total_comm or 0) }}</p>
+    {% if is_super_admin %}
+    <h2>Commission by User</h2>
+    <div class="table-responsive">
+    <table class="admin-table">
+        <thead><tr><th>User</th><th>Total Commission</th></tr></thead>
+        <tbody>
+        {% for u, amt in commission_summary %}
+        <tr><td>{{ u.full_name if u else '—' }}</td><td>₹{{ "%.2f"|format(amt) }}</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    <h2>Full History</h2>
+    {% endif %}
+    <h2>Commission Report</h2>
+    <div class="table-responsive">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>User</th>
+                <th>Referral ID</th>
+                <th>Order</th>
+                <th>Amount</th>
+                <th>Level</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in commissions %}
+            <tr>
+                <td>{{ c.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>{{ c.user.full_name }}</td>
+                <td>{{ c.user.referral_id or '—' }}</td>
+                <td>#{{ c.order_id }}</td>
+                <td>₹{{ "%.2f"|format(c.commission_amount) }}</td>
+                <td>{{ c.commission_level_name or c.commission_level }}</td>
+                <td><span class="badge badge-status-{{ (c.status or 'active')|lower }}">{{ c.status or 'active' }}</span></td>
+            </tr>
+            {% endfor %}
+            {% if not commissions %}
+            <tr><td colspan="7">No commissions yet</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endblock %}

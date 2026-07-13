@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Notification Settings - Abound Next-Gen E-Hub{% endblock %}
+{% block topbar_title %}Notification Settings{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('dashboard') }}">Dashboard</a> > Notification Settings{% endblock %}
+{% block content %}
+<div class="notifications-settings">
+    <h1>Notification Settings</h1>
+    <p class="muted">Manage how you receive updates about orders and announcements.</p>
+
+    <div class="notification-card">
+        <div class="notification-setting-row">
+            <div class="notification-setting-info">
+                <label for="push-toggle" class="notification-label">Enable Push Notifications</label>
+                <p class="notification-desc">Receive instant notifications for order updates, promotions, and announcements.</p>
+            </div>
+            <div class="notification-setting-control">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="push-toggle" {% if has_token %}checked{% endif %} aria-label="Enable push notifications">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+        <div id="notification-status" class="notification-status" role="status" aria-live="polite"></div>
+        {% if not has_token %}
+        <div id="enable-notifications-cta" class="enable-cta">
+            <button type="button" class="btn btn-primary" id="btn-enable-notifications">Enable Notifications</button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js"></script>
+<script src="{{ url_for('static', filename='js/firebase-notifications.js') }}"></script>
+<script>
+(function() {
+    var toggle = document.getElementById('push-toggle');
+    var status = document.getElementById('notification-status');
+    var btnEnable = document.getElementById('btn-enable-notifications');
+    var cta = document.getElementById('enable-notifications-cta');
+
+    function showStatus(msg, type) {
+        if (!status) return;
+        status.textContent = msg;
+        status.className = 'notification-status ' + (type || '');
+    }
+
+    function setLoading(loading) {
+        if (btnEnable) btnEnable.disabled = loading;
+        if (toggle) toggle.disabled = loading;
+    }
+
+    if (btnEnable) {
+        btnEnable.addEventListener('click', function() {
+            if (!window.AboundPush || !window.AboundPush.supported) {
+                showStatus(window.AboundPush.notSupportedReason || 'Push notifications are not supported in this browser.', 'error');
+                return;
+            }
+            setLoading(true);
+            showStatus('Requesting permission...', '');
+            window.AboundPush.enable().then(function(ok) {
+                setLoading(false);
+                if (ok) {
+                    showStatus('Push notifications enabled successfully.', 'success');
+                    if (toggle) toggle.checked = true;
+                    if (cta) cta.style.display = 'none';
+                } else {
+                    showStatus('Could not enable notifications. Please try again.', 'error');
+                }
+            }).catch(function(err) {
+                setLoading(false);
+                showStatus(err && err.message ? err.message : 'Could not enable notifications.', 'error');
+            });
+        });
+    }
+
+    if (window.AboundPush && !window.AboundPush.supported && status) {
+        showStatus(window.AboundPush.notSupportedReason || 'Push notifications are not supported in this browser.', 'error');
+    }
+
+    if (toggle) {
+        toggle.addEventListener('change', function() {
+            if (toggle.checked) {
+                if (btnEnable) {
+                    btnEnable.click();
+                }
+            } else {
+                setLoading(true);
+                window.AboundPush.disable(true).then(function(ok) {
+                    setLoading(false);
+                    showStatus('Push notifications disabled.', 'success');
+                    if (cta) cta.style.display = 'block';
+                }).catch(function() {
+                    setLoading(false);
+                    toggle.checked = true;
+                });
+            }
+        });
+    }
+})();
+</script>
+{% endblock %}

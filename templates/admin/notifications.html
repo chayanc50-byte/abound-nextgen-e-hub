@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% block title %}Notification Center - Admin{% endblock %}
+{% block topbar_title %}Notification Center{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('admin_dashboard') }}">Dashboard</a> > Notification Center{% endblock %}
+{% block content %}
+<div class="admin-page notification-center">
+    <h1>Notification Center</h1>
+    <p class="muted">Send announcements to users via push notifications and/or email.</p>
+
+    <div id="notification-message" class="alert-message" style="display:none; margin-bottom: 1rem;"></div>
+
+    <form id="notification-form" class="notification-form card">
+        <h3>Compose Notification</h3>
+
+        <div class="form-group">
+            <label for="audience">Audience</label>
+            <select id="audience" name="audience" class="form-control">
+                <option value="all">All Users</option>
+                <option value="specific">Specific User</option>
+                <option value="with_orders">Users With Orders</option>
+                <option value="without_orders">Users Without Orders</option>
+                <option value="by_level">By User Level</option>
+            </select>
+        </div>
+
+        <div id="level-select-group" class="form-group" style="display:none;">
+            <label for="target_level">User Level</label>
+            <select id="target_level" name="target_level" class="form-control">
+                <option value="">— Select Level —</option>
+                {% for lvl, name in levels %}
+                <option value="{{ lvl }}">{{ name }} – {{ commission_by_level.get(lvl, 0) }}%</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div id="specific-user-group" class="form-group" style="display:none;">
+            <label for="user-search">Specific User</label>
+            <div class="searchable-dropdown">
+                <input type="text" id="user-search" class="form-control" placeholder="Search by name, email, or user ID..." autocomplete="off">
+                <input type="hidden" id="target_user_id" name="target_user_id">
+                <div id="user-search-results" class="dropdown-results"></div>
+            </div>
+            <div id="user-selected" class="selected-item" style="display:none;"></div>
+        </div>
+
+        <div class="form-group">
+            <label for="title">Notification Title <span class="required">*</span></label>
+            <input type="text" id="title" name="title" class="form-control" maxlength="60" placeholder="e.g. New Product Launch" required>
+            <span class="char-count"><span id="title-count">0</span>/60</span>
+        </div>
+
+        <div class="form-group">
+            <label for="message">Message Body <span class="required">*</span></label>
+            <textarea id="message" name="message" class="form-control" rows="3" maxlength="150" placeholder="e.g. Check out our latest products!" required></textarea>
+            <span class="char-count"><span id="msg-count">0</span>/150</span>
+        </div>
+
+        <div class="form-group">
+            <label for="click_action">Click Action URL <span class="muted">(optional)</span></label>
+            <input type="text" id="click_action" name="click_action" class="form-control" placeholder="e.g. /dashboard or /products">
+        </div>
+
+        <div class="form-group delivery-methods">
+            <label>Delivery Methods</label>
+            <label class="checkbox-label"><input type="checkbox" id="send_push" name="send_push" checked> Send Push Notification</label>
+            <label class="checkbox-label"><input type="checkbox" id="send_email" name="send_email" checked> Send Email Notification</label>
+        </div>
+
+        <div class="preview-card" id="preview-card">
+            <div class="preview-header">Abound NextGen E Hub</div>
+            <div class="preview-title" id="preview-title">Notification Title</div>
+            <div class="preview-body" id="preview-body">Notification message will appear here.</div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-notification-send" id="send-btn">
+                <span class="btn-text">Send Notification</span>
+                <span class="btn-spinner" style="display:none;" aria-hidden="true"></span>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    var searchTimeout;
+    function searchUsers(q, callback) {
+        if (!q || q.length < 1) { callback([]); return; }
+        fetch('/admin/api/search-users?q=' + encodeURIComponent(q))
+            .then(function(r) { return r.json(); })
+            .then(function(d) { callback(d.users || []); })
+            .catch(function() { callback([]); });
+    }
+
+    var audience = document.getElementById('audience');
+    var levelGroup = document.getElementById('level-select-group');
+    var specificGroup = document.getElementById('specific-user-group');
+
+    audience.addEventListener('change', function() {
+        levelGroup.style.display = audience.value === 'by_level' ? 'block' : 'none';
+        specificGroup.style.display = audience.value === 'specific' ? 'block' : 'none';
+    });
+
+    var userSearch = document.getElementById('user-search');
+    var userResults = document.getElementById('user-search-results');
+    var userHidden = document.getElementById('target_user_id');
+    var userSelected = document.getElementById('user-selected');
+
+    userSearch.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        var q = userSearch.value.trim();
+        if (q.length < 1) { userResults.style.display = 'none'; return; }
+        searchTimeout = setTimeout(function() {
+            searchUsers(q, function(users) {
+                if (users.length === 0) {
+                    userResults.innerHTML = '<div class="dropdown-item muted">No users found</div>';
+                } else {
+                    userResults.innerHTML = users.map(function(u) {
+                        return '<div class="dropdown-item" data-id="' + u.id + '" data-name="' + (u.full_name || '').replace(/"/g, '&quot;') + '" data-email="' + (u.email || '').replace(/"/g, '&quot;') + '">' +
+                            u.full_name + ' <span class="muted">(' + (u.email || u.referral_id || '') + ') – ID: ' + u.id + '</span></div>';
+                    }).join('');
+                }
+                userResults.style.display = 'block';
+            });
+        }, 250);
+    });
+    userSearch.addEventListener('focus', function() {
+        if (userSearch.value.trim().length >= 1) userSearch.dispatchEvent(new Event('input'));
+    });
+    userResults.addEventListener('click', function(e) {
+        var item = e.target.closest('.dropdown-item[data-id]');
+        if (item) {
+            userHidden.value = item.dataset.id;
+            userSelected.innerHTML = '<strong>' + (item.dataset.name || '') + '</strong> (' + (item.dataset.email || '') + ') <a href="#" class="clear-selection">✕ Clear</a>';
+            userSelected.style.display = 'block';
+            userSearch.style.display = 'none';
+            userSearch.value = '';
+            userResults.style.display = 'none';
+            userSelected.querySelector('.clear-selection').onclick = function(ev) {
+                ev.preventDefault();
+                userHidden.value = '';
+                userSelected.style.display = 'none';
+                userSearch.style.display = 'block';
+                userSearch.focus();
+            };
+        }
+    });
+    document.addEventListener('click', function() { setTimeout(function() { userResults.style.display = 'none'; }, 150); });
+    userSearch.addEventListener('click', function(e) { e.stopPropagation(); });
+    userResults.addEventListener('click', function(e) { e.stopPropagation(); });
+
+    function updatePreview() {
+        document.getElementById('preview-title').textContent = document.getElementById('title').value || 'Notification Title';
+        document.getElementById('preview-body').textContent = document.getElementById('message').value || 'Notification message will appear here.';
+    }
+    document.getElementById('title').addEventListener('input', updatePreview);
+    document.getElementById('message').addEventListener('input', updatePreview);
+
+    function updateCharCounts() {
+        document.getElementById('title-count').textContent = document.getElementById('title').value.length;
+        document.getElementById('msg-count').textContent = document.getElementById('message').value.length;
+    }
+    document.getElementById('title').addEventListener('input', updateCharCounts);
+    document.getElementById('message').addEventListener('input', updateCharCounts);
+    updateCharCounts();
+
+    function showMsg(msg, isError) {
+        var el = document.getElementById('notification-message');
+        el.textContent = msg;
+        el.className = 'alert-message ' + (isError ? 'alert-error' : 'alert-success');
+        el.style.display = 'block';
+    }
+
+    document.getElementById('notification-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var audienceVal = audience.value;
+        var targetUserId = document.getElementById('target_user_id').value ? parseInt(document.getElementById('target_user_id').value) : null;
+        var targetLevel = document.getElementById('target_level').value ? parseInt(document.getElementById('target_level').value) : null;
+        if (audienceVal === 'specific' && !targetUserId) {
+            showMsg('Please select a user.', true);
+            return;
+        }
+        if (audienceVal === 'by_level' && !targetLevel) {
+            showMsg('Please select a user level.', true);
+            return;
+        }
+        var sendPush = document.getElementById('send_push').checked;
+        var sendEmail = document.getElementById('send_email').checked;
+        if (!sendPush && !sendEmail) {
+            showMsg('Select at least one delivery method.', true);
+            return;
+        }
+        var btn = document.getElementById('send-btn');
+        var btnText = btn.querySelector('.btn-text');
+        var btnSpinner = btn.querySelector('.btn-spinner');
+        btn.disabled = true;
+        btnText.style.display = 'none';
+        btnSpinner.style.display = 'inline-block';
+
+        fetch('/admin/notifications', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({
+                title: document.getElementById('title').value.trim(),
+                message: document.getElementById('message').value.trim(),
+                audience: audienceVal,
+                target_user_id: targetUserId,
+                target_level: targetLevel,
+                click_action: document.getElementById('click_action').value.trim() || null,
+                send_push: sendPush,
+                send_email: sendEmail
+            })
+        })
+        .then(function(r) {
+            return r.json().then(function(d) {
+                if (!r.ok) return { success: false, message: d.message || 'Request failed (' + r.status + ')' };
+                return d;
+            }).catch(function() {
+                return { success: false, message: r.ok ? 'Invalid response' : 'Request failed (' + r.status + ')' };
+            });
+        })
+        .then(function(d) {
+            if (d.success) {
+                showMsg('Notification sent successfully. Notification delivered to ' + (d.recipient_count || 0) + ' users.', false);
+                document.getElementById('title').value = '';
+                document.getElementById('message').value = '';
+                document.getElementById('click_action').value = '';
+                userHidden.value = '';
+                userSelected.style.display = 'none';
+                userSearch.style.display = 'block';
+                updatePreview();
+                updateCharCounts();
+            } else {
+                showMsg(d.message || 'Failed to send notification.', true);
+            }
+        })
+        .catch(function(err) {
+            showMsg('Request failed: ' + (err.message || 'Please check your connection.'), true);
+        })
+        .finally(function() {
+            btn.disabled = false;
+            btnText.style.display = 'inline';
+            btnSpinner.style.display = 'none';
+        });
+    });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Abound Next-Gen E-Hub{% endblock %}
+{% block topbar_title %}Dashboard{% endblock %}
+{% block breadcrumb %}Dashboard{% endblock %}
+{% block content %}
+<div class="dashboard">
+    <h1>Welcome, {{ user.full_name }}!</h1>
+    
+    <div class="my-network">
+        <h2>My Network</h2>
+        <div class="stats-grid">
+            <div class="stat-card stat-referral">
+                <div class="stat-icon">🔗</div>
+                <div class="stat-content">
+                    <h3 class="referral-code">{{ user.referral_id or '—' }}</h3>
+                    <p>Your Referral ID</p>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="copyText('{{ user.referral_id or '' }}')">Copy</button>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-content">
+                    <h4>Referral Link</h4>
+                    <p class="referral-link">{{ app_url }}/register?ref={{ user.referral_id or '' }}</p>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="copyRefLink()">Copy Link</button>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">📊</div>
+                <div class="stat-content">
+                    <h3>{{ user.level_name }}</h3>
+                    <p>My Level</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">👥</div>
+                <div class="stat-content">
+                    <h3>{{ team_count }}</h3>
+                    <p>Total Team Members</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">📋</div>
+                <div class="stat-content">
+                    <h3>{{ direct_count }}</h3>
+                    <p>Direct Referrals</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">💰</div>
+                <div class="stat-content">
+                    <h3>₹{{ "%.2f"|format(wallet.total_earnings or 0) }}</h3>
+                    <p>Total Earnings</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="quick-actions my-wallet">
+        <h2>My Wallet</h2>
+        <div class="wallet-cards">
+            <div class="stat-card"><h4>Total Earnings</h4><h3>₹{{ "%.2f"|format(wallet.total_earnings or 0) }}</h3></div>
+            <div class="stat-card"><h4>Available Balance</h4><h3>₹{{ "%.2f"|format(wallet.available_balance or 0) }}</h3></div>
+            <div class="stat-card"><h4>Withdrawn</h4><h3>₹{{ "%.2f"|format(wallet.withdrawn_balance or 0) }}</h3></div>
+        </div>
+        <p><a href="{{ url_for('my_commissions') }}" class="btn btn-secondary btn-sm">View Commission History</a></p>
+    </div>
+
+    <div class="quick-actions">
+        <h2>My Orders</h2>
+        {% if orders %}
+        <div class="table-responsive">
+        <table class="admin-table" style="margin-bottom: 1.5rem;">
+            <thead><tr><th>Order</th><th>Product</th><th>Amount</th><th>Status</th></tr></thead>
+            <tbody>
+            {% for o in orders %}
+            <tr>
+                <td>#{{ o.id }} ({{ o.created_at.strftime('%Y-%m-%d') }})</td>
+                <td>{{ o.product.name }} x{{ o.quantity or 1 }}</td>
+                <td>₹{{ "%.2f"|format(o.amount * (o.quantity or 1)) }}</td>
+                <td><span class="badge badge-status-{{ (o.status or 'Pending')|lower }}">{{ o.status or 'Pending' }}</span></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p class="muted">No orders yet.</p>
+        {% endif %}
+    </div>
+
+    <div class="quick-actions notification-promo" id="notification-promo"{% if has_push_token %} style="display:none;"{% endif %}>
+        <h2>Stay Updated</h2>
+        <p class="muted">Get instant push notifications for order updates and announcements.</p>
+        <button type="button" class="btn btn-primary" id="btn-enable-dashboard-notifications">Enable Notifications</button>
+        <p id="notification-success-msg" class="notification-success-msg" style="display:none;">Push notifications enabled successfully.</p>
+    </div>
+    {% if has_push_token %}
+    <div class="quick-actions notification-enabled" id="notification-enabled-msg">
+        <p class="muted">🔔 Push notifications are enabled. <a href="{{ url_for('profile_notifications') }}">Manage</a></p>
+    </div>
+    {% endif %}
+
+    <div class="quick-actions">
+        <h2>Quick Actions</h2>
+        <div class="action-buttons">
+            <a href="{{ url_for('my_team') }}" class="btn btn-primary">My Team & Structure</a>
+            <a href="{{ url_for('products') }}" class="btn btn-secondary">View Products</a>
+        </div>
+    </div>
+
+    <div class="quick-actions levels-section">
+        <h2>Career Levels</h2>
+        <p class="progress-desc">10-level growth structure. Earn 10 direct referrals at your level to promote to the next.</p>
+        <div class="levels-grid">
+            {% for lvl, name in levels %}
+            <div class="level-card {% if user.user_level == lvl %}level-current{% endif %}">
+                <span class="level-num">{{ lvl }}</span>
+                <span class="level-name">{{ name }}</span>
+                <span class="level-commission">{{ commission_by_level.get(lvl, 0) }}% commission</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="progress-section">
+        <h2>Promotion Progress</h2>
+        <p class="progress-desc">Need 10 direct referrals at your level to promote to next level</p>
+        <div id="promotion-progress" class="progress-container">
+            <div class="progress-bar">
+                <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+            </div>
+            <p id="progress-text" class="progress-text">Loading...</p>
+        </div>
+    </div>
+
+    <div class="team-tree-preview">
+        <h2>My Team Structure</h2>
+        <div id="team-tree" class="tree-container"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js"></script>
+<script src="{{ url_for('static', filename='js/firebase-notifications.js') }}"></script>
+<script>
+    const appUrl = "{{ app_url or 'http://localhost:5001' }}";
+    function copyText(t) { if(t) navigator.clipboard.writeText(t).then(() => alert('Copied!')); }
+    function copyRefLink() {
+        const link = appUrl + '/register?ref={{ user.referral_id or "" }}';
+        navigator.clipboard.writeText(link).then(() => alert('Referral link copied!'));
+    }
+    var btnEnable = document.getElementById('btn-enable-dashboard-notifications');
+    var successMsg = document.getElementById('notification-success-msg');
+    var promo = document.getElementById('notification-promo');
+    if (btnEnable && window.AboundPush) {
+        btnEnable.addEventListener('click', function() {
+            if (!window.AboundPush.supported) {
+                alert(window.AboundPush.notSupportedReason || 'Push notifications not supported');
+                return;
+            }
+            btnEnable.disabled = true;
+            window.AboundPush.enable().then(function(ok) {
+                btnEnable.disabled = false;
+                if (ok && successMsg) {
+                    successMsg.style.display = 'block';
+                    if (promo) promo.querySelector('p.muted').style.display = 'none';
+                    btnEnable.style.display = 'none';
+                }
+            }).catch(function() { btnEnable.disabled = false; });
+        });
+    }
+    fetch('/api/team-stats').then(r => r.json()).then(data => {
+        const el = document.getElementById('progress-text');
+        const fill = document.getElementById('progress-fill');
+        if (data.next_level) {
+            const pct = ((data.direct_at_level || 0) / data.next_level.required * 100).toFixed(1);
+            fill.style.width = Math.min(pct, 100) + '%';
+            el.textContent = (data.direct_at_level || 0) + ' / ' + data.next_level.required + ' direct ' + data.current_level + 's';
+        } else {
+            fill.style.width = '100%';
+            el.textContent = 'Maximum level reached!';
+        }
+    });
+    fetch('/api/team-tree').then(r => r.json()).then(function buildTree(data) {
+        function render(n, d) {
+            if (!n) return '';
+            let h = '<div class="tree-node" style="margin-left:'+(d*18)+'px">';
+            h += '├─ <strong>' + n.name + '</strong> <span class="badge">' + n.level + '</span>' + (n.ref_id ? ' ('+n.ref_id+')' : '') + '<br>';
+            if (n.children && n.children.length) n.children.forEach(c => h += render(c, d+1));
+            return h + '</div>';
+        }
+        document.getElementById('team-tree').innerHTML = render(data) || '<p>No team members yet.</p>';
+    });
+</script>
+{% endblock %}

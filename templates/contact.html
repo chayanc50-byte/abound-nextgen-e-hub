@@ -1,0 +1,96 @@
+{% extends "base_public.html" %}
+
+{% block title %}Contact Us - Abound Next-Gen E-Hub{% endblock %}
+
+{% block content %}
+<!-- 1. Hero Section -->
+<section class="contact-hero">
+    <div class="contact-hero-content">
+        <h1>Contact Us</h1>
+        <p class="contact-hero-subtitle">We're here to help you. Reach out to us anytime.</p>
+    </div>
+</section>
+
+<!-- 2. Contact Information Section -->
+<section class="contact-section">
+    <div class="contact-info-card">
+        <h2>Abound NextGen E Hub</h2>
+        <p class="contact-detail"><strong>Phone:</strong> <a href="tel:+919007376556">+91 90073 76556</a></p>
+        <p class="contact-detail"><strong>Email:</strong> <a href="mailto:aboundehub@gmail.com">aboundehub@gmail.com</a></p>
+        <p class="contact-detail"><strong>Address:</strong> Subhas Pally, Falakata, District - Alipurduar, PIN - 735211, West Bengal, India</p>
+        <p class="contact-detail"><strong>Facebook:</strong> <a href="https://www.facebook.com/baidyanath.mahanta.5/" target="_blank" rel="noopener noreferrer">Visit our Facebook</a></p>
+        <p class="contact-message">For any queries related to products, orders, partnerships, or technical support, please contact us at the email above or use the contact form below.</p>
+    </div>
+
+    <!-- Support Options -->
+    <div class="support-section">
+        <h2 class="support-section-title">Support Options</h2>
+        <div class="support-grid">
+            <div class="support-card">
+                <div class="support-card-icon">📞</div>
+                <h3>Call Support</h3>
+                <p>Speak directly with our support team.</p>
+                <a href="tel:+919007376556" class="support-button">Call Now</a>
+            </div>
+            <div class="support-card">
+                <div class="support-card-icon">💬</div>
+                <h3>WhatsApp</h3>
+                <p>Chat instantly with our team.</p>
+                <a href="https://wa.me/919007376556" class="support-button" target="_blank" rel="noopener noreferrer">Chat on WhatsApp</a>
+            </div>
+            <div class="support-card">
+                <div class="support-card-icon">📧</div>
+                <h3>Email Support</h3>
+                <p>Send us your questions anytime.</p>
+                <a href="mailto:aboundehub@gmail.com" class="support-button">Send Email</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Office Address + Map -->
+    <div class="office-card">
+        <h3>Our Office</h3>
+        <p class="office-address">
+            Subhas Pally, Falakata<br>
+            District - Alipurduar<br>
+            PIN - 735211<br>
+            West Bengal, India
+        </p>
+        <iframe src="https://maps.google.com/maps?q=Falakata%20Alipurduar&t=&z=13&ie=UTF8&iwloc=&output=embed" width="100%" height="250" style="border:0;border-radius:12px;" title="Office location map"></iframe>
+    </div>
+
+    <!-- Contact Form -->
+    <div class="contact-form-wrap">
+    <form method="POST" action="{{ url_for('contact') }}" class="contact-form">
+        <div class="form-group">
+            <label for="name">Name</label>
+            <input type="text" id="name" name="name" required placeholder="Your name">
+        </div>
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" required placeholder="your@email.com">
+        </div>
+        <div class="form-group">
+            <label for="subject">Subject</label>
+            <input type="text" id="subject" name="subject" required placeholder="Subject of your message">
+        </div>
+        <div class="form-group">
+            <label for="message">Message</label>
+            <textarea id="message" name="message" required rows="5" placeholder="Your message"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary contact-submit-btn">Send Message</button>
+    </form>
+    </div>
+
+    <!-- Quick Links Section -->
+    <div class="contact-quick-links">
+        <h3>Quick Links</h3>
+        <div class="contact-quick-links-buttons">
+            <a href="{{ url_for('index') }}" class="btn btn-primary">Home</a>
+            <a href="{{ url_for('about') }}" class="btn btn-primary">About Us</a>
+            <a href="{{ url_for('faq') }}" class="btn btn-primary">FAQ</a>
+            <a href="{{ url_for('login') }}" class="btn btn-primary">Login</a>
+        </div>
+    </div>
+</section>
+{% endblock %}

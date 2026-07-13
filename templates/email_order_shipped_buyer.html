@@ -1,0 +1,29 @@
+{% extends "email_base_order.html" %}
+{% block email_title %}Order Shipped #{{ order.id }}{% endblock %}
+{% block email_heading %}Your Order Has Been Shipped{% endblock %}
+{% block email_content %}
+<p style="margin:0 0 20px 0; font-size:15px; color:#555555; line-height:1.6;">Hello {{ order.user.full_name }},</p>
+<p style="margin:0 0 20px 0; font-size:15px; color:#555555; line-height:1.6;">Good news! Your order from <strong>Abound NextGen E Hub</strong> has been shipped.</p>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f9f9f9; border-radius:6px; border:1px solid #eeeeee; margin-bottom:20px;">
+  <tr>
+    <td style="padding:16px 20px; border-bottom:1px solid #eeeeee;">
+      <p style="margin:0; font-size:14px; font-weight:700; color:#333333;">Order Details</p>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:16px 20px;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+        <tr><td style="padding:4px 0; font-size:14px; color:#555555;">Order ID:</td><td style="padding:4px 0; font-size:14px; color:#333333; text-align:right;">#{{ order.id }}</td></tr>
+        <tr><td style="padding:4px 0; font-size:14px; color:#555555;">Product:</td><td style="padding:4px 0; font-size:14px; color:#333333; text-align:right;">{{ order.product.name }}</td></tr>
+        <tr><td style="padding:4px 0; font-size:14px; color:#555555;">Quantity:</td><td style="padding:4px 0; font-size:14px; color:#333333; text-align:right;">{{ order.quantity }}</td></tr>
+        <tr><td style="padding:8px 0 4px 0; font-size:14px; font-weight:700; color:#333333;">Total Amount:</td><td style="padding:8px 0 4px 0; font-size:16px; font-weight:700; color:#ff7a00; text-align:right;">₹{{ "%.2f"|format(order.amount * (order.quantity or 1)) }}</td></tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<p style="margin:0; font-size:15px; color:#555555; line-height:1.6;">Your package is now on the way.</p>
+<p style="margin:16px 0 0 0; font-size:15px; color:#555555; line-height:1.6;">Thank you for shopping with us.</p>
+<p style="margin:20px 0 0 0; font-size:14px; color:#333333;"><strong>Regards,</strong><br>Abound NextGen E Hub</p>
+{% endblock %}

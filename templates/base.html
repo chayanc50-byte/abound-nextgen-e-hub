@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#ff7a00">
+    <title>{% block title %}Abound Next-Gen E-Hub{% endblock %}</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/icon-192.png') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=3">
+</head>
+<body class="{% if 'user_id' in session %}internal-layout{% endif %}">
+    {% if 'user_id' in session %}
+    {# Universal Sidebar Layout – All logged-in users #}
+    <aside class="app-sidebar" id="app-sidebar">
+        <div class="sidebar-header">
+            {% if logo_url %}<img src="{{ logo_url }}" alt="Logo" class="sidebar-logo">{% endif %}
+            <h2 class="sidebar-brand">Abound Next-Gen E-Hub</h2>
+            <span class="sidebar-subtitle">An Abound Entertainment Venture</span>
+        </div>
+        <nav class="sidebar-nav">
+            {% if is_admin %}
+            {# Admin Menu #}
+            <div class="sidebar-menu">
+                <a href="{{ url_for('admin_dashboard') }}" class="sidebar-item {% if request.endpoint == 'admin_dashboard' %}active{% endif %}">
+                    <span class="sidebar-icon">📊</span> Dashboard
+                </a>
+            </div>
+            {% if is_super_admin %}
+            <div class="sidebar-accordion" data-menu="users">
+                <div class="sidebar-item accordion-toggle {% if request.endpoint in ['admin_users','admin_user','admin_user_create','admin_reassign_user'] %}active{% endif %}">
+                    <span class="sidebar-icon">👥</span> User Management
+                    <span class="accordion-arrow">▼</span>
+                </div>
+                <div class="accordion-content">
+                    <a href="{{ url_for('admin_users') }}" class="sidebar-subitem {% if request.endpoint == 'admin_users' %}active{% endif %}">All Users</a>
+                    <a href="{{ url_for('admin_user_create') }}" class="sidebar-subitem {% if request.endpoint == 'admin_user_create' %}active{% endif %}">Create User</a>
+                    <a href="{{ url_for('admin_reassign_user') }}" class="sidebar-subitem {% if request.endpoint == 'admin_reassign_user' %}active{% endif %}">Reassign User</a>
+                </div>
+            </div>
+            {% endif %}
+            <div class="sidebar-accordion" data-menu="products">
+                <div class="sidebar-item accordion-toggle {% if request.endpoint in ['admin_products','admin_product_add','admin_product_edit'] %}active{% endif %}">
+                    <span class="sidebar-icon">📦</span> Products
+                    <span class="accordion-arrow">▼</span>
+                </div>
+                <div class="accordion-content">
+                    <a href="{{ url_for('admin_products') }}" class="sidebar-subitem {% if request.endpoint == 'admin_products' %}active{% endif %}">Product List</a>
+                    <a href="{{ url_for('admin_product_add') }}" class="sidebar-subitem {% if request.endpoint == 'admin_product_add' %}active{% endif %}">Add Product</a>
+                    <a href="{{ url_for('admin_products') }}" class="sidebar-subitem {% if request.endpoint == 'admin_products' %}active{% endif %}">Categories</a>
+                </div>
+            </div>
+            <div class="sidebar-accordion" data-menu="orders">
+                <div class="sidebar-item accordion-toggle {% if request.endpoint == 'admin_orders' %}active{% endif %}">
+                    <span class="sidebar-icon">🛒</span> Orders
+                    <span class="accordion-arrow">▼</span>
+                </div>
+                <div class="accordion-content">
+                    <a href="{{ url_for('admin_orders') }}" class="sidebar-subitem">All Orders</a>
+                    <a href="{{ url_for('admin_orders') }}?status=pending" class="sidebar-subitem">Pending Orders</a>
+                    <a href="{{ url_for('admin_orders') }}?status=completed" class="sidebar-subitem">Completed Orders</a>
+                </div>
+            </div>
+            <div class="sidebar-accordion" data-menu="commissions">
+                <div class="sidebar-item accordion-toggle {% if request.endpoint in ['admin_commissions','admin_wallets'] %}active{% endif %}">
+                    <span class="sidebar-icon">💰</span> Commissions
+                    <span class="accordion-arrow">▼</span>
+                </div>
+                <div class="accordion-content">
+                    <a href="{{ url_for('admin_commissions') }}" class="sidebar-subitem {% if request.endpoint == 'admin_commissions' %}active{% endif %}">Commission List</a>
+                    {% if is_super_admin %}
+                    <a href="{{ url_for('admin_wallets') }}" class="sidebar-subitem {% if request.endpoint == 'admin_wallets' %}active{% endif %}">Wallet Balances</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% if is_super_admin %}
+            <div class="sidebar-accordion" data-menu="reports">
+                <div class="sidebar-item accordion-toggle">
+                    <span class="sidebar-icon">📈</span> Reports
+                    <span class="accordion-arrow">▼</span>
+                </div>
+                <div class="accordion-content">
+                    <a href="/admin-sales-report" class="sidebar-subitem">Sales Report</a>
+                    <a href="/admin-commission-report" class="sidebar-subitem">Commission Report</a>
+                </div>
+            </div>
+            <div class="sidebar-menu">
+                <a href="{{ url_for('admin_notifications') }}" class="sidebar-item {% if request.endpoint == 'admin_notifications' %}active{% endif %}">
+                    <span class="sidebar-icon">📢</span> Notification Center
+                </a>
+            </div>
+            <div class="sidebar-accordion" data-menu="system">
+                <div class="sidebar-item accordion-toggle {% if request.endpoint in ['admin_activity_logs','admin_tree_health','admin_recalculate_commission','email_test'] %}active{% endif %}">
+                    <span class="sidebar-icon">⚙️</span> System
+                    <span class="accordion-arrow">▼</span>
+                </div>
+                <div class="accordion-content">
+                    <a href="{{ url_for('admin_activity_logs') }}" class="sidebar-subitem {% if request.endpoint == 'admin_activity_logs' %}active{% endif %}">Activity Logs</a>
+                    <a href="{{ url_for('admin_tree_health') }}" class="sidebar-subitem {% if request.endpoint == 'admin_tree_health' %}active{% endif %}">Tree Health</a>
+                    <a href="{{ url_for('admin_recalculate_commission') }}" class="sidebar-subitem {% if request.endpoint == 'admin_recalculate_commission' %}active{% endif %}">Recalc Commission</a>
+                    <a href="{{ url_for('email_test') }}" class="sidebar-subitem {% if request.endpoint == 'email_test' %}active{% endif %}">Email Test</a>
+                    <a href="{{ url_for('profile_notifications') }}" class="sidebar-subitem {% if request.endpoint == 'profile_notifications' %}active{% endif %}">Notification Settings</a>
+                    <a href="{{ url_for('admin_reassign_user') }}" class="sidebar-subitem {% if request.endpoint == 'admin_reassign_user' %}active{% endif %}">Reassign User</a>
+                </div>
+            </div>
+            {% else %}
+            <div class="sidebar-menu">
+                <a href="{{ url_for('admin_notifications') }}" class="sidebar-item {% if request.endpoint == 'admin_notifications' %}active{% endif %}">
+                    <span class="sidebar-icon">📢</span> Notification Center
+                </a>
+            </div>
+            <div class="sidebar-accordion" data-menu="system">
+                <div class="sidebar-item accordion-toggle {% if request.endpoint in ['email_test','admin_reassign_user'] %}active{% endif %}">
+                    <span class="sidebar-icon">⚙️</span> System
+                    <span class="accordion-arrow">▼</span>
+                </div>
+                <div class="accordion-content">
+                    <a href="{{ url_for('email_test') }}" class="sidebar-subitem {% if request.endpoint == 'email_test' %}active{% endif %}">Email Test</a>
+                    <a href="{{ url_for('profile_notifications') }}" class="sidebar-subitem {% if request.endpoint == 'profile_notifications' %}active{% endif %}">Notification Settings</a>
+                    <a href="{{ url_for('admin_reassign_user') }}" class="sidebar-subitem {% if request.endpoint == 'admin_reassign_user' %}active{% endif %}">Reassign User</a>
+                </div>
+            </div>
+            {% endif %}
+            {% else %}
+            {# Sales User Menu #}
+            <div class="sidebar-menu">
+                <a href="{{ url_for('dashboard') }}" class="sidebar-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                    <span class="sidebar-icon">📊</span> Dashboard
+                </a>
+            </div>
+            <div class="sidebar-menu">
+                <a href="{{ url_for('products') }}" class="sidebar-item {% if request.endpoint == 'products' %}active{% endif %}">
+                    <span class="sidebar-icon">📦</span> Products
+                </a>
+            </div>
+            <div class="sidebar-menu">
+                <a href="{{ url_for('my_team') }}" class="sidebar-item {% if request.endpoint == 'my_team' %}active{% endif %}">
+                    <span class="sidebar-icon">👥</span> My Team
+                </a>
+            </div>
+            <div class="sidebar-menu">
+                <a href="{{ url_for('my_commissions') }}" class="sidebar-item {% if request.endpoint == 'my_commissions' %}active{% endif %}">
+                    <span class="sidebar-icon">💰</span> My Commissions
+                </a>
+            </div>
+            <div class="sidebar-menu">
+                <a href="{{ url_for('profile_addresses') }}" class="sidebar-item {% if request.endpoint in ['profile_addresses','profile_address_add','profile_address_edit'] %}active{% endif %}">
+                    <span class="sidebar-icon">📍</span> My Addresses
+                </a>
+            </div>
+            <div class="sidebar-menu">
+                <a href="{{ url_for('profile_notifications') }}" class="sidebar-item {% if request.endpoint == 'profile_notifications' %}active{% endif %}">
+                    <span class="sidebar-icon">🔔</span> Notification Settings
+                </a>
+            </div>
+            <div class="sidebar-accordion" data-menu="system">
+                <div class="sidebar-item accordion-toggle {% if request.endpoint == 'email_test' %}active{% endif %}">
+                    <span class="sidebar-icon">⚙️</span> System
+                    <span class="accordion-arrow">▼</span>
+                </div>
+                <div class="accordion-content">
+                    <a href="{{ url_for('email_test') }}" class="sidebar-subitem {% if request.endpoint == 'email_test' %}active{% endif %}">Email Test</a>
+                </div>
+            </div>
+            {% endif %}
+        </nav>
+    </aside>
+    <div id="sidebar-overlay" class="sidebar-overlay" aria-hidden="true"></div>
+    <div class="app-main">
+        <header class="app-topbar">
+            <div class="topbar-left">
+                <button type="button" class="hamburger-btn" id="hamburger-btn" aria-label="Toggle menu">☰</button>
+                <span class="topbar-title">{% block topbar_title %}Dashboard{% endblock %}</span>
+            </div>
+            <div class="topbar-user">
+                <span class="topbar-name">{{ current_user.full_name if current_user else session.username }} ({{ current_user.level_name if current_user else session.get('level_name', 'Sales Executive') }})</span>
+                <a href="{{ url_for('logout') }}" class="topbar-logout">Logout</a>
+            </div>
+        </header>
+        <div class="app-content">
+            <nav class="app-breadcrumb">{% block breadcrumb %}{% endblock %}</nav>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages">
+                        {% for category, message in messages %}
+                            <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+            <div class="main-page-card">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- PWA Install Banner -->
+    <div id="pwa-install-banner" class="pwa-install-banner" style="display:none;" aria-hidden="true">
+        <div class="pwa-install-content">
+            <span class="pwa-install-text">Install Abound NextGen E Hub</span>
+            <div class="pwa-install-actions">
+                <button type="button" class="pwa-install-btn" id="pwa-install-btn">Install</button>
+                <button type="button" class="pwa-install-dismiss" id="pwa-install-dismiss" aria-label="Dismiss">&times;</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/pwa.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

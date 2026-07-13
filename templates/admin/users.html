@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Admin Users - Abound Next-Gen E-Hub{% endblock %}
+{% block topbar_title %}Users{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('admin_dashboard') }}">Dashboard</a> > User Management > All Users{% endblock %}
+{% block content %}
+<div class="admin-page">
+    <h1>All Users</h1>
+    <p>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary btn-sm">← Back to Dashboard</a>
+        <a href="{{ url_for('admin_user_create') }}" class="btn btn-primary btn-sm" style="margin-left: 0.5rem;">Create User</a>
+    </p>
+    <form method="GET" class="search-form" style="margin-bottom: 1rem;">
+        <input type="text" name="search" value="{{ search or '' }}" placeholder="Search by Name, Email, or Referral ID">
+        <button type="submit" class="btn btn-primary btn-sm">Search</button>
+        {% if search %}<a href="{{ url_for('admin_users') }}">Clear</a>{% endif %}
+    </form>
+    <div id="delete-message" class="alert-message" style="display:none; margin-bottom: 1rem;"></div>
+    <div class="table-responsive">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Level</th>
+                <th>Referral ID</th>
+                <th>Team Size</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in users %}
+            <tr id="user-row-{{ u.id }}">
+                <td>{{ u.id }}</td>
+                <td>{{ u.full_name }}</td>
+                <td>{{ u.email }}</td>
+                <td><span class="badge">{{ u.user_role or 'user' }}</span></td>
+                <td>{{ u.level_name }}</td>
+                <td>{{ u.referral_id or '—' }}</td>
+                <td>{{ u.get_all_descendants()|length }}</td>
+                <td>
+                    <a href="{{ url_for('admin_user', user_id=u.id) }}" class="btn btn-secondary btn-sm">Edit</a>
+                    {% if u.user_role == 'user' %}
+                    <a href="{{ url_for('admin_reassign_user', user_id=u.id) }}" class="btn btn-sm" style="background:#059669;color:white; margin-left: 0.25rem;">Reassign</a>
+                    <button type="button" class="btn btn-sm" style="background:#dc2626;color:white; margin-left: 0.25rem;" onclick="openDeleteModal({{ u.id }}, '{{ u.full_name | e }}')">Delete</button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<!-- Delete confirmation modal -->
+<div id="delete-user-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h3>Delete User</h3>
+        <p>Are you sure you want to permanently delete <strong id="delete-user-name"></strong>? This cannot be undone.</p>
+        <p class="muted">Deletion is only allowed if the user has no downline and removal does not affect sponsor promotion.</p>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+            <button type="button" class="btn" id="delete-confirm-btn" style="background:#dc2626;color:white;">Delete User</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let deleteTargetId = null;
+
+function openDeleteModal(userId, fullName) {
+    deleteTargetId = userId;
+    document.getElementById('delete-user-name').textContent = fullName;
+    document.getElementById('delete-user-modal').style.display = 'block';
+}
+
+function closeDeleteModal() {
+    deleteTargetId = null;
+    document.getElementById('delete-user-modal').style.display = 'none';
+}
+
+function showMessage(msg, isError) {
+    const el = document.getElementById('delete-message');
+    el.textContent = msg;
+    el.className = 'alert-message ' + (isError ? 'alert-error' : 'alert-success');
+    el.style.display = 'block';
+    setTimeout(function() { el.style.display = 'none'; }, 8000);
+}
+
+document.getElementById('delete-confirm-btn').addEventListener('click', function() {
+    if (!deleteTargetId) return;
+    this.disabled = true;
+    this.textContent = 'Deleting...';
+    fetch('/admin/delete-user/' + deleteTargetId, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(function(r) { return r.json().catch(function() { return {}; }); })
+    .then(function(data) {
+        if (data.status === 'success') {
+            var row = document.getElementById('user-row-' + deleteTargetId);
+            if (row) row.remove();
+            showMessage(data.message, false);
+            closeDeleteModal();
+        } else {
+            showMessage(data.message || 'Deletion failed.', true);
+        }
+    })
+    .catch(function() {
+        showMessage('Request failed. Please try again.', true);
+    })
+    .finally(function() {
+        document.getElementById('delete-confirm-btn').disabled = false;
+        document.getElementById('delete-confirm-btn').textContent = 'Delete User';
+    });
+});
+
+document.getElementById('delete-user-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeDeleteModal();
+});
+</script>
+{% endblock %}

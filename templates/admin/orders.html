@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Orders - Admin{% endblock %}
+{% block topbar_title %}Orders{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('admin_dashboard') }}">Dashboard</a> > Orders{% endblock %}
+{% block content %}
+<div class="admin-page">
+    <h1>Orders</h1>
+    <p><a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary btn-sm">← Back to Dashboard</a></p>
+    <div id="order-message" class="alert-message" style="display:none; margin-bottom: 1rem;"></div>
+    <div class="table-responsive">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>ID</th><th>Date</th><th>Customer</th><th>Product</th><th>Qty</th><th>Amount</th><th>Status</th><th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for o in orders %}
+            <tr id="order-row-{{ o.id }}">
+                <td>#{{ o.id }}</td>
+                <td>{{ o.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>{{ o.user.full_name }}<br><small>{{ o.user.email }}</small><br>{% if o.phone or o.user.phone %}<small>Tel: {{ o.phone or o.user.phone }}</small>{% endif %}</td>
+                <td>{{ o.product.name }}</td>
+                <td>{{ o.quantity or 1 }}</td>
+                <td>₹{{ "%.2f"|format(o.amount * (o.quantity or 1)) }}</td>
+                <td><span class="badge badge-status-{{ (o.status or 'Pending')|lower }}">{{ o.status or 'Pending' }}</span></td>
+                <td>
+                    <a href="{{ url_for('admin_order_shipping_slip', order_id=o.id) }}" class="btn btn-secondary btn-sm" target="_blank">View Order</a>
+                    <a href="{{ url_for('admin_order_shipping_slip', order_id=o.id) }}" class="btn btn-primary btn-sm no-print" target="_blank">Print Shipping Slip</a>
+                    {% if o.status != 'Shipped' and o.status != 'Delivered' and o.status != 'Cancelled' %}
+                    <button type="button" class="btn btn-sm btn-mark-shipped" data-order-id="{{ o.id }}" style="background:#059669;color:white;">Mark as Shipped</button>
+                    {% endif %}
+                    <form method="POST" action="{{ url_for('admin_order_status', order_id=o.id) }}" style="display:inline; margin-left: 0.25rem;">
+                        <select name="status" onchange="this.form.submit()" class="status-select">
+                            <option value="Pending" {% if o.status == 'Pending' %}selected{% endif %}>Pending</option>
+                            <option value="Processing" {% if o.status == 'Processing' %}selected{% endif %}>Processing</option>
+                            <option value="Shipped" {% if o.status == 'Shipped' %}selected{% endif %}>Shipped</option>
+                            <option value="Delivered" {% if o.status == 'Delivered' %}selected{% endif %}>Delivered</option>
+                            <option value="Cancelled" {% if o.status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+                        </select>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not orders %}
+            <tr><td colspan="8">No orders yet</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<script>
+(function() {
+    function showMsg(msg, isError) {
+        var el = document.getElementById('order-message');
+        el.textContent = msg;
+        el.className = 'alert-message ' + (isError ? 'alert-error' : 'alert-success');
+        el.style.display = 'block';
+        setTimeout(function() { el.style.display = 'none'; }, 5000);
+    }
+    document.querySelectorAll('.btn-mark-shipped').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var orderId = this.dataset.orderId;
+            if (!confirm('Mark order #' + orderId + ' as Shipped? Buyer and admins will be notified by email.')) return;
+            var self = this;
+            self.disabled = true;
+            self.textContent = '...';
+            fetch('/admin/orders/' + orderId + '/mark-shipped', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function(r) { return r.json().catch(function() { return {}; }); })
+            .then(function(d) {
+                if (d.status === 'success') {
+                    showMsg(d.message, false);
+                    var row = document.getElementById('order-row-' + orderId);
+                    if (row) {
+                        var badge = row.querySelector('.badge');
+                        if (badge) { badge.textContent = 'Shipped'; badge.className = 'badge badge-status-shipped'; }
+                        self.remove();
+                        var select = row.querySelector('.status-select');
+                        if (select) select.value = 'Shipped';
+                    }
+                } else showMsg(d.message || 'Failed.', true);
+            })
+            .catch(function() { showMsg('Request failed.', true); })
+            .finally(function() { self.disabled = false; self.textContent = 'Mark as Shipped'; });
+        });
+    });
+})();
+</script>
+{% endblock %}

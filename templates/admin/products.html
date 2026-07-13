@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Product Management - Admin{% endblock %}
+{% block topbar_title %}Products{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('admin_dashboard') }}">Dashboard</a> > Products{% endblock %}
+{% block content %}
+<div class="admin-page">
+    <h1>Product Management</h1>
+    <div class="admin-section-card">
+        <h2 class="section-title">Categories</h2>
+        <form method="POST" action="{{ url_for('admin_category_add') }}" class="inline-form">
+            <input type="text" name="name" placeholder="New category name" required>
+            <button type="submit" class="btn btn-primary">Add Category</button>
+        </form>
+        <div class="table-responsive">
+        <table class="admin-table" style="margin-top: 0.5rem;">
+            <thead><tr><th>Category</th><th>Actions</th></tr></thead>
+            <tbody>
+            {% for c in categories %}
+            <tr>
+                <td>{{ c.name }}</td>
+                <td>
+                    <form method="POST" action="{{ url_for('admin_category_edit', cat_id=c.id) }}" style="display:inline;">
+                        <input type="text" name="name" value="{{ c.name }}" style="width:120px;">
+                        <button type="submit" class="btn btn-secondary btn-sm">Save</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('admin_category_delete', cat_id=c.id) }}" style="display:inline;" onsubmit="return confirm('Delete?');">
+                        <button type="submit" class="btn btn-delete btn-sm">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not categories %}
+            <tr><td colspan="2">No categories yet.</td></tr>
+            {% endif %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+
+    <div class="admin-section-card">
+        <h2 class="section-title">Products</h2>
+        <div class="table-responsive">
+        <table class="admin-table">
+        <thead>
+            <tr>
+                <th>Image</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in products %}
+            <tr>
+                <td>{% if p.image_url %}<img src="{{ p.image_url }}" alt="" style="height:40px;">{% else %}—{% endif %}</td>
+                <td>{{ p.name }}</td>
+                <td>{{ p.category.name if p.category else '—' }}</td>
+                <td>₹{{ "%.2f"|format(p.price) }}</td>
+                <td>{{ p.stock_quantity if p.stock_quantity is not none else '∞' }}{% if p.stock_quantity is not none and p.stock_quantity <= 0 %} <span class="badge badge-status-cancelled">Out of Stock</span>{% endif %}</td>
+                <td>
+                    <a href="{{ url_for('admin_product_edit', prod_id=p.id) }}" class="btn btn-secondary btn-sm">Edit</a>
+                    <form method="POST" action="{{ url_for('admin_product_delete', prod_id=p.id) }}" style="display:inline;" onsubmit="return confirm('Delete {{ p.name }}?');">
+                        <button type="submit" class="btn btn-delete btn-sm">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not products %}
+            <tr><td colspan="6">No products yet.</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}My Addresses - Abound Next-Gen E-Hub{% endblock %}
+{% block topbar_title %}My Addresses{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('dashboard') }}">Dashboard</a> > My Addresses{% endblock %}
+{% block content %}
+<div class="addresses-page">
+    <div class="page-header-row">
+        <h1>Saved Addresses</h1>
+        <a href="{{ url_for('profile_address_add') }}" class="btn btn-add-address">+ Add New Address</a>
+    </div>
+
+    {% if addresses %}
+    <div class="addresses-grid">
+        {% for addr in addresses %}
+        <div class="address-card">
+            {% if addr.is_default %}
+            <span class="address-badge default-badge">Default Address</span>
+            {% endif %}
+            <div class="address-card-body">
+                <p class="address-name">{{ addr.full_name }}</p>
+                <p class="address-line">{{ addr.street_address }}</p>
+                {% if addr.landmark %}
+                <p class="address-line">{{ addr.landmark }}</p>
+                {% endif %}
+                <p class="address-line">{{ addr.city }}, {{ addr.state }} - {{ addr.pincode }}</p>
+                <p class="address-phone">Phone: {{ addr.phone }}</p>
+            </div>
+            <div class="address-card-actions">
+                {% if not addr.is_default %}
+                <form action="{{ url_for('profile_address_set_default', addr_id=addr.id) }}" method="POST" class="inline-form">
+                    <button type="submit" class="btn btn-link-small">Set Default</button>
+                </form>
+                {% endif %}
+                <a href="{{ url_for('profile_address_edit', addr_id=addr.id) }}" class="btn btn-edit">Edit</a>
+                <form action="{{ url_for('profile_address_delete', addr_id=addr.id) }}" method="POST" class="inline-form" onsubmit="return confirm('Delete this address?');">
+                    <button type="submit" class="btn btn-delete">Delete</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>You don't have any saved addresses yet.</p>
+        <a href="{{ url_for('profile_address_add') }}" class="btn btn-primary">+ Add New Address</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

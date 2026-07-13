@@ -1,0 +1,54 @@
+{% extends "base_public.html" %}
+
+{% block title %}Register - Abound Next-Gen E-Hub{% endblock %}
+
+{% block content %}
+<div class="login-split">
+    <div class="login-split-image">
+        <div class="login-image-overlay"></div>
+        <div class="login-image-content">
+            <h2>Join Our Network</h2>
+            <p>Create your account and start building your business with Abound Next-Gen E-Hub.</p>
+        </div>
+    </div>
+    <div class="login-split-form">
+        <div class="login-form-card">
+            {% if logo_url %}<img src="{{ logo_url }}" alt="Abound Next-Gen E-Hub" class="login-logo">{% endif %}
+            <h1>Register</h1>
+            {% if referrer %}
+            <p class="referrer-msg">You're joining under {{ referrer.full_name }}</p>
+            {% else %}
+            <p class="login-subtitle">Create your account</p>
+            {% endif %}
+
+            <form method="POST" class="login-form">
+                <div class="form-group form-float">
+                    <input type="text" id="referral_id" name="referral_id" placeholder=" " value="{{ referral_id }}" maxlength="12" style="text-transform: uppercase;">
+                    <label for="referral_id">Referral ID (required)</label>
+                </div>
+                <div class="form-group form-float">
+                    <input type="text" id="full_name" name="full_name" required placeholder=" ">
+                    <label for="full_name">Full Name</label>
+                </div>
+                <div class="form-group form-float">
+                    <input type="text" id="username" name="username" required placeholder=" ">
+                    <label for="username">Username</label>
+                </div>
+                <div class="form-group form-float">
+                    <input type="email" id="email" name="email" required placeholder=" ">
+                    <label for="email">Email</label>
+                </div>
+                <div class="form-group form-float">
+                    <input type="password" id="password" name="password" required minlength="6" placeholder=" ">
+                    <label for="password">Password</label>
+                </div>
+                <button type="submit" class="btn btn-primary">Register</button>
+            </form>
+            
+            <div class="login-links">
+                <a href="{{ url_for('login') }}">Already have an account? Login</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

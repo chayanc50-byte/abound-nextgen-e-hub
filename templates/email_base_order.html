@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>{% block email_title %}Notification{% endblock %}</title>
+<!--[if mso]>
+<style type="text/css">
+  table { border-collapse: collapse; }
+  .wrapper { width: 600px !important; }
+</style>
+<![endif]-->
+</head>
+<body style="margin:0; padding:0; background-color:#f5f6f8; font-family:Arial, Helvetica, sans-serif; -webkit-font-smoothing:antialiased;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f5f6f8;">
+    <tr>
+      <td align="center" style="padding:24px 16px;">
+        <table role="presentation" class="wrapper" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px; width:100%; background-color:#ffffff; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.08); overflow:hidden;">
+          <!-- Header -->
+          <tr>
+            <td style="background-color:#ff7a00; background:linear-gradient(135deg, #ff7a00 0%, #e65100 100%); padding:20px 24px; text-align:left;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td style="vertical-align:middle;">
+                    <!-- Logo: place logo.png in static/images/ for branding -->
+                    <img src="{{ app_url }}/static/images/logo.png" alt="" width="48" height="48" style="display:inline-block; vertical-align:middle; max-height:48px;" onerror="this.style.display='none'">
+                    <span style="display:inline-block; vertical-align:middle; margin-left:12px; font-size:20px; font-weight:700; color:#ffffff;">Abound NextGen E Hub</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <!-- Title -->
+          <tr>
+            <td style="padding:28px 24px 16px 24px;">
+              <h1 style="margin:0; font-size:24px; font-weight:700; color:#333333;">{% block email_heading %}{% endblock %}</h1>
+            </td>
+          </tr>
+          <!-- Content -->
+          <tr>
+            <td style="padding:0 24px 24px 24px;">
+              {% block email_content %}{% endblock %}
+              {% block email_cta %}{% endblock %}
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#f4f4f4; padding:20px 24px; border-top:1px solid #e8e8e8;">
+              <p style="margin:0 0 8px 0; font-size:12px; color:#888888; line-height:1.5;">Thank you for using Abound NextGen E Hub</p>
+              <p style="margin:0 0 4px 0; font-size:12px; color:#888888;">Support:</p>
+              <p style="margin:0 0 2px 0; font-size:12px; color:#888888;">Phone: +91 90073 76556</p>
+              <p style="margin:0 0 2px 0; font-size:12px; color:#888888;">Email: aboundehub@gmail.com</p>
+              <p style="margin:12px 0 0 0; font-size:12px; color:#888888;">Subhas Pally, Falakata<br>Alipurduar, West Bengal<br>India</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

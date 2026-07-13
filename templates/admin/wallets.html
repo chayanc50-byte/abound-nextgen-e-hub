@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Wallet Report - Super Admin{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('admin_dashboard') }}">Dashboard</a> > Commissions > Wallet Balances{% endblock %}
+{% block content %}
+<div class="admin-page">
+    <h1>Wallet Report</h1>
+    <p><a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary btn-sm">← Back to Dashboard</a></p>
+    <div class="table-responsive">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>User</th>
+                <th>Referral ID</th>
+                <th>Total Earnings</th>
+                <th>Available Balance</th>
+                <th>Withdrawn</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for w in wallets %}
+            <tr>
+                <td>{{ w.user.full_name }} ({{ w.user.email }})</td>
+                <td>{{ w.user.referral_id or '—' }}</td>
+                <td>₹{{ "%.2f"|format(w.total_earnings or 0) }}</td>
+                <td>₹{{ "%.2f"|format(w.available_balance or 0) }}</td>
+                <td>₹{{ "%.2f"|format(w.withdrawn_balance or 0) }}</td>
+            </tr>
+            {% endfor %}
+            {% if not wallets %}
+            <tr><td colspan="5">No wallets yet.</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endblock %}

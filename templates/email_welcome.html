@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.7; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; margin-bottom: 24px; }
+        .content { background: #fefce8; padding: 28px; border-radius: 12px; border: 1px solid #fef08a; }
+        .detail { margin: 12px 0; }
+        .referral-id { font-size: 1.4em; font-weight: bold; letter-spacing: 2px; color: #ea580c; background: #fff; padding: 8px 16px; border-radius: 8px; display: inline-block; margin: 8px 0; }
+        .account-box { background: #fff; padding: 16px; border-radius: 8px; margin: 20px 0; border: 1px solid #fef08a; }
+        h2 { color: #ea580c; font-size: 1.15em; margin: 24px 0 12px; }
+        h3 { font-size: 1em; margin: 16px 0 8px; }
+        ul { margin: 8px 0; padding-left: 24px; }
+        .footer { margin-top: 28px; font-size: 0.9em; color: #666; text-align: center; }
+        a { color: #ea580c; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1 style="color: #ea580c;">Welcome to Abound Next-Gen E-Hub</h1>
+        <p>An Abound Entertainment Venture</p>
+    </div>
+    
+    <div class="content">
+        <p>Dear {{ full_name }},</p>
+        
+        <p>Welcome to <strong>Abound Next-Gen E-Hub</strong>!<br>
+        We're delighted to have you join our growing family of passionate sales professionals. Your journey with us begins today, and we are excited to support you every step of the way.</p>
+        
+        <div class="account-box">
+            <p><strong>Your account details:</strong></p>
+            <div class="detail"><strong>Username:</strong> {{ username }}</div>
+            {% if referral_id %}
+            <div class="detail"><strong>Your Referral ID:</strong> <span class="referral-id">{{ referral_id }}</span></div>
+            <p>Share your Referral ID with others so they can join under you when they are onboarded.</p>
+            {% else %}
+            <div class="detail"><strong>Account type:</strong> Administrative (no referral ID)</div>
+            {% endif %}
+            <p><a href="{{ app_url }}/login">Log in to your dashboard →</a></p>
+        </div>
+
+        <h2>🌟 How Our Team Structure Works</h2>
+        
+        <p>Abound Next-Gen E-Hub follows a <strong>10-level growth pyramid</strong>, designed to reward leadership, teamwork, and dedication.</p>
+        
+        <p><strong>Here's your path to success:</strong></p>
+        
+        <p><strong>Level 1</strong><br>
+        ⬇ Onboard <strong>10 team members</strong><br>
+        <strong>Level 2</strong><br>
+        ⬇ Onboard <strong>10 team members</strong><br>
+        <strong>Level 3</strong><br>
+        ⬇ Continue building your team…<br>
+        …<br>
+        <strong>Up to Level 10</strong> – The highest leadership position in the Abound Next-Gen E-Hub sales structure.</p>
+        
+        <p>Each time you successfully onboard <strong>10 people under your guidance</strong>, you rise to the <strong>next level</strong>, unlocking:</p>
+        
+        <ul>
+            <li>Greater recognition</li>
+            <li>Higher earning potential</li>
+            <li>Expanded leadership opportunities</li>
+            <li>Exclusive rewards and incentives</li>
+        </ul>
+
+        <h2>🚀 Your First Step</h2>
+        
+        <p>Log in to your dashboard, explore your tools, and begin connecting with people who can grow alongside you. Every great leader starts with a single step — and today, you've taken yours.</p>
+        
+        <p>We are proud to have you with us and look forward to celebrating your achievements.</p>
+        
+        <p>If you need any assistance, our support team is always here to help.</p>
+    </div>
+    
+    <div class="footer">
+        <p><strong>Warm regards,</strong><br>
+        <strong>Team Abound Next-Gen E-Hub</strong><br>
+        Empowering Growth • Building Leaders • Creating Success</p>
+    </div>
+</body>
+</html>

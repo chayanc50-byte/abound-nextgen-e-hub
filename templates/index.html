@@ -1,0 +1,135 @@
+{% extends "base_public.html" %}
+
+{% block title %}Abound Next-Gen E-Hub - Empowering Your Business Growth{% endblock %}
+{% block body_class %}public-homepage{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div class="hero-overlay"></div>
+    <div class="hero-content">
+        <h1 class="hero-title">Empowering Your Business Growth</h1>
+        <p class="hero-subtitle">Join Abound Next-Gen E-Hub and build your future with trusted products and a strong network.</p>
+        <div class="hero-buttons">
+            <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg">Join Now</a>
+            <a href="{{ url_for('catalog') }}" class="btn btn-white btn-lg">Explore Products</a>
+            <a href="{{ url_for('download_apk') }}" class="btn btn-apk btn-lg" download>Download APK</a>
+        </div>
+    </div>
+</section>
+
+<section class="section section-alt" id="categories">
+    <div class="container">
+        <h2 class="section-title">Our Product Categories</h2>
+        <div class="categories-grid">
+            <a href="{{ url_for('catalog') }}" class="category-card">
+                <div class="category-icon">🏠</div>
+                <h3>Household Essentials</h3>
+            </a>
+            <a href="{{ url_for('catalog') }}" class="category-card">
+                <div class="category-icon">🛒</div>
+                <h3>Grocery Products</h3>
+            </a>
+            <a href="{{ url_for('catalog') }}" class="category-card">
+                <div class="category-icon">💄</div>
+                <h3>Cosmetics</h3>
+            </a>
+            <a href="{{ url_for('catalog') }}" class="category-card">
+                <div class="category-icon">🧴</div>
+                <h3>Personal Care</h3>
+            </a>
+            <a href="{{ url_for('catalog') }}" class="category-card">
+                <div class="category-icon">🍳</div>
+                <h3>Kitchen Items</h3>
+            </a>
+            <a href="{{ url_for('catalog') }}" class="category-card">
+                <div class="category-icon">📦</div>
+                <h3>Daily Needs</h3>
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container">
+        <h2 class="section-title">Popular Products</h2>
+        <div class="products-grid public-products">
+            {% for product in products %}
+            <a href="{{ url_for('login') }}" class="product-card-link">
+                <div class="product-card">
+                    <div class="product-image">
+                        {% if product.image_url %}
+                            <img src="{{ product.image_url }}" alt="{{ product.name }}">
+                        {% else %}
+                            <div class="product-placeholder">📦</div>
+                        {% endif %}
+                    </div>
+                    <div class="product-info">
+                        <h3>{{ product.name }}</h3>
+                        <p class="product-price">₹{{ "%.2f"|format(product.price) }}</p>
+                        <span class="btn btn-primary btn-sm">View & Buy</span>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% if not products %}
+        <p class="text-center muted">No products yet. <a href="{{ url_for('register') }}">Join us</a> to get started!</p>
+        {% else %}
+        <div class="text-center" style="margin-top: 2rem;">
+            <a href="{{ url_for('catalog') }}" class="btn btn-primary">View All Products</a>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<section class="section section-alt">
+    <div class="container">
+        <h2 class="section-title">Why Choose Abound Next-Gen E-Hub</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">✓</div>
+                <h3>Trusted Products</h3>
+                <p>Quality products you can rely on for your family and customers.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📈</div>
+                <h3>Business Opportunity</h3>
+                <p>Build your own business with our proven referral and commission system.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🌐</div>
+                <h3>Growing Network</h3>
+                <p>Join a supportive community of ambitious entrepreneurs.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">💬</div>
+                <h3>Reliable Support</h3>
+                <p>We're here to help you succeed every step of the way.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section business-section">
+    <div class="container">
+        <div class="business-row">
+            <div class="business-content">
+                <h2 class="section-title">Build Your Own Business</h2>
+                <p>Join a next-generation e-commerce platform designed for ambitious individuals. Grow your team, earn commissions, and create lasting success.</p>
+                <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg">Become a Partner</a>
+            </div>
+            <div class="business-image">
+                <div class="business-image-placeholder"></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="cta-section">
+    <div class="container">
+        <h2 class="cta-title">Start Your Journey Today</h2>
+        <p class="cta-subtitle">Join thousands building their future with Abound Next-Gen E-Hub.</p>
+        <a href="{{ url_for('register') }}" class="btn btn-white btn-lg">Register Now</a>
+    </div>
+</section>
+{% endblock %}

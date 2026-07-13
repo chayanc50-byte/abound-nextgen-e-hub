@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Super Admin - Abound Next-Gen E-Hub{% endblock %}
+{% block topbar_title %}Dashboard{% endblock %}
+{% block breadcrumb %}Dashboard{% endblock %}
+{% block content %}
+<div class="admin-page">
+    <h1>Super Admin Dashboard</h1>
+    {% if can_create_first_sales %}
+    <div class="admin-banner">
+        <p>No sales users yet. <a href="{{ url_for('create_first_sales_user') }}" class="btn btn-primary">Create First Sales User</a></p>
+    </div>
+    {% endif %}
+    <div class="admin-stats">
+        <div class="stat-box"><h3>{{ total_users }}</h3><p>Total Users</p></div>
+        <div class="stat-box"><h3>₹{{ "%.2f"|format(total_sales) }}</h3><p>Total Sales</p></div>
+        <div class="stat-box"><h3>₹{{ "%.2f"|format(total_commissions) }}</h3><p>Total Commissions</p></div>
+        <div class="stat-box"><h3>{{ total_orders }}</h3><p>Total Orders</p></div>
+    </div>
+    <div class="admin-actions">
+        <form class="search-form" onsubmit="searchByRef(event)">
+            <input type="text" name="ref" placeholder="Search by Referral ID" class="search-input">
+            <button type="submit" class="btn btn-primary">Search</button>
+        </form>
+        <div id="search-result" class="search-result"></div>
+    </div>
+    <h2>Recent Users</h2>
+    <div class="table-responsive">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>ID</th><th>Name</th><th>Username</th><th>Referral ID</th><th>Level</th><th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in users %}
+            <tr>
+                <td>{{ u.id }}</td>
+                <td>{{ u.full_name }}</td>
+                <td>{{ u.username }}</td>
+                <td>{{ u.referral_id or '—' }}</td>
+                <td><span class="badge">{{ u.level_name }}</span></td>
+                <td>
+                    <a href="{{ url_for('admin_user', user_id=u.id) }}" class="btn btn-secondary btn-sm">Edit</a>
+                    {% if u.user_role == 'user' %}<a href="{{ url_for('admin_reassign_user', user_id=u.id) }}" class="btn btn-sm" style="background:#059669;color:white; margin-left: 0.25rem;">Reassign</a>{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+<script>
+async function searchByRef(e) {
+    e.preventDefault();
+    const ref = e.target.ref.value.trim().toUpperCase();
+    const r = await fetch('/admin/search?ref=' + encodeURIComponent(ref));
+    const d = await r.json();
+    const el = document.getElementById('search-result');
+    if (d.found && d.user) {
+        el.innerHTML = '<div class="found">Found: ' + d.user.full_name + ' <a href="/admin/user/' + d.user.id + '">View</a></div>';
+    } else {
+        el.innerHTML = '<div class="not-found">No user with referral ID: ' + ref + '</div>';
+    }
+}
+</script>
+{% endblock %}

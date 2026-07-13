@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}Recalculate Commission - Super Admin{% endblock %}
+{% block topbar_title %}Recalculate Commission{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('admin_dashboard') }}">Dashboard</a> > Recalculate Commission{% endblock %}
+{% block content %}
+<div class="admin-page">
+    <h1>Commission Recalculation Tool</h1>
+
+    <div class="recalc-warning">
+        <strong>⚠️ Warning:</strong> This will recompute commissions and may change wallet balances. Only Paid orders are processed.
+    </div>
+
+    <div id="recalc-message" class="alert-message" style="display:none; margin: 1rem 0;"></div>
+
+    <div class="card recalc-card">
+        <h3>Select Scope</h3>
+        <form id="recalc-form">
+            <div class="form-group">
+                <label>Mode</label>
+                <select name="mode" id="recalc-mode">
+                    <option value="">-- Select --</option>
+                    <option value="order">Specific Order</option>
+                    <option value="user">Specific User</option>
+                    <option value="date_range">Date Range</option>
+                </select>
+            </div>
+
+            <div id="mode-order" class="mode-fields" style="display:none;">
+                <div class="form-group">
+                    <label for="order_id">Order ID</label>
+                    <input type="number" id="order_id" name="order_id" min="1" placeholder="e.g. 42">
+                </div>
+            </div>
+
+            <div id="mode-user" class="mode-fields" style="display:none;">
+                <div class="form-group">
+                    <label for="recalc-user-input">Select User</label>
+                    <div class="searchable-dropdown">
+                        <input type="text" id="recalc-user-input" class="form-control" placeholder="Search by username or referral ID..." autocomplete="off">
+                        <input type="hidden" id="user_id" name="user_id">
+                        <div id="recalc-user-results" class="dropdown-results"></div>
+                    </div>
+                    <div id="recalc-user-selected" class="selected-item" style="display:none;"></div>
+                </div>
+            </div>
+
+            <div id="mode-date_range" class="mode-fields" style="display:none;">
+                <div class="form-group">
+                    <label for="date_from">From Date</label>
+                    <input type="date" id="date_from" name="date_from">
+                </div>
+                <div class="form-group">
+                    <label for="date_to">To Date</label>
+                    <input type="date" id="date_to" name="date_to">
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" id="recalc-btn">Recalculate Commission</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    var modeSelect = document.getElementById('recalc-mode');
+    var modeOrder = document.getElementById('mode-order');
+    var modeUser = document.getElementById('mode-user');
+    var modeDate = document.getElementById('mode-date_range');
+    var searchTimeout;
+
+    function showModeFields() {
+        modeOrder.style.display = 'none';
+        modeUser.style.display = 'none';
+        modeDate.style.display = 'none';
+        var m = modeSelect.value;
+        if (m === 'order') modeOrder.style.display = 'block';
+        else if (m === 'user') modeUser.style.display = 'block';
+        else if (m === 'date_range') modeDate.style.display = 'block';
+    }
+    modeSelect.addEventListener('change', showModeFields);
+
+    function showMsg(msg, isError) {
+        var el = document.getElementById('recalc-message');
+        el.textContent = msg;
+        el.className = 'alert-message ' + (isError ? 'alert-error' : 'alert-success');
+        el.style.display = 'block';
+        setTimeout(function() { el.style.display = 'none'; }, 6000);
+    }
+
+    function searchUsers(q, callback) {
+        if (!q || q.length < 2) { callback([]); return; }
+        fetch('/admin/api/search-users?q=' + encodeURIComponent(q))
+            .then(function(r) { return r.json(); })
+            .then(function(d) { callback(d.users || []); })
+            .catch(function() { callback([]); });
+    }
+
+    var recalcInput = document.getElementById('recalc-user-input');
+    var recalcResults = document.getElementById('recalc-user-results');
+    var recalcHidden = document.getElementById('user_id');
+    var recalcSelected = document.getElementById('recalc-user-selected');
+
+    function renderRecalcResults(users) {
+        if (users.length === 0) {
+            recalcResults.innerHTML = '<div class="dropdown-item muted">No users found</div>';
+        } else {
+            recalcResults.innerHTML = users.map(function(u) {
+                return '<div class="dropdown-item" data-id="' + u.id + '" data-name="' + (u.full_name || '').replace(/"/g, '&quot;') + '" data-ref="' + (u.referral_id || '') + '">' +
+                    u.full_name + ' <span class="muted">(' + (u.referral_id || u.username || u.email) + ')</span></div>';
+            }).join('');
+        }
+        recalcResults.style.display = 'block';
+    }
+
+    function selectRecalcUser(id, name, ref) {
+        recalcHidden.value = id;
+        recalcSelected.innerHTML = '<strong>' + (name || '') + '</strong>' + (ref ? ' <code>' + ref + '</code>' : '') + ' <a href="#" class="clear-selection">✕ Clear</a>';
+        recalcSelected.style.display = 'block';
+        recalcInput.style.display = 'none';
+        recalcResults.style.display = 'none';
+        recalcInput.value = '';
+        recalcSelected.querySelector('.clear-selection').onclick = function(ev) {
+            ev.preventDefault();
+            recalcHidden.value = '';
+            recalcSelected.style.display = 'none';
+            recalcInput.style.display = 'block';
+            recalcInput.focus();
+        };
+    }
+
+    recalcInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        var q = recalcInput.value.trim();
+        if (q.length < 2) {
+            recalcResults.style.display = q.length ? 'block' : 'none';
+            if (q.length) renderRecalcResults([]);
+            return;
+        }
+        searchTimeout = setTimeout(function() { searchUsers(q, renderRecalcResults); }, 250);
+    });
+
+    recalcInput.addEventListener('focus', function() {
+        if (recalcInput.value.trim().length >= 2) searchUsers(recalcInput.value.trim(), renderRecalcResults);
+    });
+
+    recalcResults.addEventListener('click', function(e) {
+        var item = e.target.closest('.dropdown-item[data-id]');
+        if (item) selectRecalcUser(parseInt(item.dataset.id), item.dataset.name, item.dataset.ref);
+    });
+
+    document.addEventListener('click', function() { setTimeout(function() { recalcResults.style.display = 'none'; }, 150); });
+    recalcInput.addEventListener('click', function(e) { e.stopPropagation(); });
+    recalcResults.addEventListener('click', function(e) { e.stopPropagation(); });
+
+    document.getElementById('recalc-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var mode = modeSelect.value;
+        if (!mode) {
+            showMsg('Please select a mode.', true);
+            return;
+        }
+        var payload = { mode: mode };
+        if (mode === 'order') {
+            var oid = document.getElementById('order_id').value.trim();
+            if (!oid) { showMsg('Enter Order ID.', true); return; }
+            payload.order_id = parseInt(oid);
+        } else if (mode === 'user') {
+            var uid = recalcHidden.value;
+            if (!uid) { showMsg('Search and select a user.', true); return; }
+            payload.user_id = parseInt(uid);
+        } else if (mode === 'date_range') {
+            var df = document.getElementById('date_from').value;
+            var dt = document.getElementById('date_to').value;
+            if (!df || !dt) { showMsg('Select both dates.', true); return; }
+            payload.date_from = df;
+            payload.date_to = dt;
+        }
+        if (!confirm('This will recompute commissions and may change wallet balances. Proceed?')) return;
+        var btn = document.getElementById('recalc-btn');
+        btn.disabled = true;
+        btn.textContent = 'Processing...';
+        fetch('/admin/recalculate-commission', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify(payload)
+        })
+        .then(function(r) { return r.json().catch(function() { return {}; }); })
+        .then(function(d) {
+            if (d.status === 'success') {
+                showMsg(d.message, false);
+            } else {
+                showMsg(d.message || 'Recalculation failed.', true);
+            }
+        })
+        .catch(function() { showMsg('Request failed.', true); })
+        .finally(function() {
+            btn.disabled = false;
+            btn.textContent = 'Recalculate Commission';
+        });
+    });
+})();
+</script>
+{% endblock %}

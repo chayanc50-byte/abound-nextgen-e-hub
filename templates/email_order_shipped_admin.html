@@ -1,0 +1,46 @@
+{% extends "email_base_order.html" %}
+{% block email_title %}Order Shipped #{{ order.id }}{% endblock %}
+{% block email_heading %}Order Shipped Notification{% endblock %}
+{% block email_content %}
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f9f9f9; border-radius:6px; border:1px solid #eeeeee; margin-bottom:20px;">
+  <tr>
+    <td style="padding:16px 20px; border-bottom:1px solid #eeeeee;">
+      <p style="margin:0; font-size:14px; font-weight:700; color:#333333;">Order Details</p>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:16px 20px;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+        <tr><td style="padding:4px 0; font-size:14px; color:#555555;">Order ID:</td><td style="padding:4px 0; font-size:14px; color:#333333; text-align:right;">#{{ order.id }}</td></tr>
+        <tr><td style="padding:4px 0; font-size:14px; color:#555555;">Status:</td><td style="padding:4px 0; font-size:14px; color:#2e7d32; font-weight:600; text-align:right;">Shipped</td></tr>
+        <tr><td style="padding:4px 0; font-size:14px; color:#555555;">Shipped At:</td><td style="padding:4px 0; font-size:14px; color:#333333; text-align:right;">{{ order.shipped_at.strftime('%Y-%m-%d %H:%M') if order.shipped_at else '—' }}</td></tr>
+        <tr><td style="padding:4px 0; font-size:14px; color:#555555;">Product:</td><td style="padding:4px 0; font-size:14px; color:#333333; text-align:right;">{{ order.product.name }} × {{ order.quantity }}</td></tr>
+        <tr><td style="padding:8px 0 4px 0; font-size:14px; font-weight:700; color:#333333;">Amount:</td><td style="padding:8px 0 4px 0; font-size:16px; font-weight:700; color:#ff7a00; text-align:right;">₹{{ "%.2f"|format(order.amount * (order.quantity or 1)) }}</td></tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f9f9f9; border-radius:6px; border:1px solid #eeeeee;">
+  <tr>
+    <td style="padding:16px 20px; border-bottom:1px solid #eeeeee;">
+      <p style="margin:0; font-size:14px; font-weight:700; color:#333333;">Customer</p>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:16px 20px;">
+      <p style="margin:0 0 6px 0; font-size:14px; color:#333333;"><strong>Buyer:</strong> {{ order.user.full_name }}</p>
+      <p style="margin:0; font-size:14px; color:#333333;"><strong>Email:</strong> {{ order.user.email }}</p>
+    </td>
+  </tr>
+</table>
+{% endblock %}
+{% block email_cta %}
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:24px;">
+  <tr>
+    <td align="center" style="padding:16px 0;">
+      <a href="{{ app_url }}/admin/orders" style="display:inline-block; background-color:#ff7a00; color:#ffffff !important; text-decoration:none; padding:12px 24px; border-radius:6px; font-size:15px; font-weight:600;">View Order in Admin Dashboard</a>
+    </td>
+  </tr>
+</table>
+{% endblock %}

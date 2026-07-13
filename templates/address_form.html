@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit Address' if is_edit else 'Add Address' }} - Abound Next-Gen E-Hub{% endblock %}
+{% block topbar_title %}{{ 'Edit Address' if is_edit else 'Add New Address' }}{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('dashboard') }}">Dashboard</a> > <a href="{{ url_for('profile_addresses') }}">My Addresses</a> > {{ 'Edit' if is_edit else 'Add' }}{% endblock %}
+{% block content %}
+<div class="address-form-page">
+    <h1>{{ 'Edit Address' if is_edit else 'Add New Address' }}</h1>
+
+    <form method="POST" class="address-form" id="address-form">
+        <div class="form-group">
+            <label for="full_name">Full Name <span class="required">*</span></label>
+            <input type="text" id="full_name" name="full_name" required
+                value="{{ (address.full_name if address else (form_data.get('full_name') if form_data else '')) or '' }}"
+                placeholder="Your full name">
+        </div>
+        <div class="form-group">
+            <label for="phone">Phone Number <span class="required">*</span></label>
+            <input type="tel" id="phone" name="phone" required maxlength="10"
+                value="{{ (address.phone if address else (form_data.get('phone') if form_data else '')) or '' }}"
+                placeholder="10-digit mobile number">
+            <span class="field-error" id="phone-error"></span>
+        </div>
+        <div class="form-group">
+            <label for="street_address">Street Address <span class="required">*</span></label>
+            <input type="text" id="street_address" name="street_address" required
+                value="{{ (address.street_address if address else (form_data.get('street_address') if form_data else '')) or '' }}"
+                placeholder="House No, Street, Area">
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="city">City <span class="required">*</span></label>
+                <input type="text" id="city" name="city" required
+                    value="{{ (address.city if address else (form_data.get('city') if form_data else '')) or '' }}"
+                    placeholder="City or town">
+            </div>
+            <div class="form-group">
+                <label for="state">State <span class="required">*</span></label>
+                <input type="text" id="state" name="state" required
+                    value="{{ (address.state if address else (form_data.get('state') if form_data else '')) or '' }}"
+                    placeholder="State">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="pincode">PIN Code <span class="required">*</span></label>
+                <input type="text" id="pincode" name="pincode" required maxlength="6"
+                    value="{{ (address.pincode if address else (form_data.get('pincode') if form_data else '')) or '' }}"
+                    placeholder="6-digit PIN">
+                <span class="field-error" id="pincode-error"></span>
+            </div>
+            <div class="form-group">
+                <label for="country">Country</label>
+                <input type="text" id="country" name="country"
+                    value="{{ (address.country if address else (form_data.get('country') if form_data else 'India')) or 'India' }}"
+                    placeholder="Country">
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="landmark">Landmark <span class="muted">(optional)</span></label>
+            <input type="text" id="landmark" name="landmark"
+                value="{{ (address.landmark if address else (form_data.get('landmark') if form_data else '')) or '' }}"
+                placeholder="Near Post Office / Temple">
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-lg">{{ 'Update Address' if is_edit else 'Save Address' }}</button>
+            <a href="{{ url_for('profile_addresses') }}" class="btn btn-secondary btn-lg">Cancel</a>
+        </div>
+    </form>
+</div>
+<script>
+(function() {
+    var form = document.getElementById('address-form');
+    var phoneInput = document.getElementById('phone');
+    var pincodeInput = document.getElementById('pincode');
+    var phoneError = document.getElementById('phone-error');
+    var pincodeError = document.getElementById('pincode-error');
+
+    function validatePhone() {
+        var v = (phoneInput.value || '').trim();
+        if (!v) { phoneError.textContent = ''; return false; }
+        if (!/^[0-9]{10}$/.test(v)) {
+            phoneError.textContent = 'Please enter a valid 10-digit phone number.';
+            return false;
+        }
+        phoneError.textContent = '';
+        return true;
+    }
+    function validatePincode() {
+        var v = (pincodeInput.value || '').trim();
+        if (!v) { pincodeError.textContent = ''; return false; }
+        if (!/^[0-9]{6}$/.test(v)) {
+            pincodeError.textContent = 'Please enter a valid 6-digit PIN code.';
+            return false;
+        }
+        pincodeError.textContent = '';
+        return true;
+    }
+
+    phoneInput.addEventListener('input', function() {
+        this.value = this.value.replace(/\D/g, '').slice(0, 10);
+        validatePhone();
+    });
+    pincodeInput.addEventListener('input', function() {
+        this.value = this.value.replace(/\D/g, '').slice(0, 6);
+        validatePincode();
+    });
+
+    form.addEventListener('submit', function(e) {
+        if (!validatePhone() || !validatePincode()) {
+            e.preventDefault();
+            return false;
+        }
+    });
+})();
+</script>
+{% endblock %}

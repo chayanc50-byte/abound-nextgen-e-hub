@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Order Confirmed - Abound Next-Gen E-Hub{% endblock %}
+{% block topbar_title %}Order Confirmed{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('dashboard') }}">Dashboard</a> > Order Confirmed{% endblock %}
+{% block content %}
+<div class="order-success-page">
+    <div class="success-card">
+        <div class="success-icon">✓</div>
+        <h1>Order Placed Successfully!</h1>
+        <p class="success-message">Thank you for your purchase. Your order has been confirmed.</p>
+        {% if order %}
+        <div class="order-details-box">
+            <p><strong>Order ID:</strong> #{{ order.id }}</p>
+            <p><strong>Product:</strong> {{ order.product.name }}</p>
+            <p><strong>Quantity:</strong> {{ order.quantity }}</p>
+            <p><strong>Total:</strong> ₹{{ "%.2f"|format(order.amount * order.quantity) }}</p>
+        </div>
+        {% endif %}
+        <div class="success-actions">
+            <a href="{{ url_for('products') }}" class="btn btn-primary btn-lg">Continue Shopping</a>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary btn-lg">Back to Dashboard</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

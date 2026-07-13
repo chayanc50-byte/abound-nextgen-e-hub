@@ -1,0 +1,86 @@
+{% extends "base_public.html" %}
+
+{% block title %}FAQ - Abound Next-Gen E-Hub{% endblock %}
+
+{% block content %}
+<!-- 1. Hero Section -->
+<section class="contact-hero faq-hero">
+    <div class="contact-hero-content">
+        <h1>Frequently Asked Questions</h1>
+        <p class="contact-hero-subtitle">Find answers to common questions about Abound NextGen E Hub</p>
+    </div>
+</section>
+
+<!-- 2. FAQ Accordion Section -->
+<section class="faq-section">
+    <div class="faq-container">
+        <div class="faq-accordion">
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>What is Abound NextGen E Hub?</span>
+                    <span class="faq-icon">▼</span>
+                </div>
+                <div class="faq-answer">
+                    <p>Abound NextGen E Hub is a modern e-commerce network marketing platform that allows individuals to promote and sell products online while building a strong network and earning commissions.</p>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>How do I register?</span>
+                    <span class="faq-icon">▼</span>
+                </div>
+                <div class="faq-answer">
+                    <p>You can register directly on the website by creating an account or by using a referral ID from an existing member.</p>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>How does the commission system work?</span>
+                    <span class="faq-icon">▼</span>
+                </div>
+                <div class="faq-answer">
+                    <p>When someone joins using your referral ID and purchases products, you earn commissions based on the defined commission structure of the platform.</p>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>Can I earn from my own purchases?</span>
+                    <span class="faq-icon">▼</span>
+                </div>
+                <div class="faq-answer">
+                    <p>No. Commissions are earned when members in your network make purchases.</p>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>How can I contact support?</span>
+                    <span class="faq-icon">▼</span>
+                </div>
+                <div class="faq-answer">
+                    <p>You can contact our support team via email at <a href="mailto:aboundehub@gmail.com">aboundehub@gmail.com</a> or through the <a href="{{ url_for('contact') }}">Contact Us</a> page.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.faq-question').forEach(function(q) {
+        q.addEventListener('click', function() {
+            var item = this.closest('.faq-item');
+            var wasOpen = item.classList.contains('is-open');
+            document.querySelectorAll('.faq-item').forEach(function(i) { i.classList.remove('is-open'); });
+            if (!wasOpen) item.classList.add('is-open');
+        });
+    });
+});
+</script>
+{% endblock %}

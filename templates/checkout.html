@@ -1,0 +1,432 @@
+{% extends "base.html" %}
+{% block title %}Checkout - Abound Next-Gen E-Hub{% endblock %}
+{% block topbar_title %}Checkout{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('dashboard') }}">Dashboard</a> > <a href="{{ url_for('products') }}">Products</a> > Checkout{% endblock %}
+{% block content %}
+<div class="checkout-page">
+    <h1>Checkout</h1>
+
+    <form method="POST" action="{{ url_for('place_order', product_id=product.id) }}" id="checkout-form" novalidate>
+        <input type="hidden" name="product_id" value="{{ product.id }}">
+        <input type="hidden" name="quantity" value="{{ quantity }}">
+        <input type="hidden" name="shipping_address" id="shipping_address_hidden">
+        <input type="hidden" name="selected_address_id" id="selected_address_id" value="{{ default_address_id or '' }}">
+
+        <div class="checkout-grid">
+            <div class="checkout-main">
+                <div class="checkout-card checkout-section">
+                    <h3>Product Summary</h3>
+                    <div class="checkout-summary">
+                        <div class="summary-image">
+                            {% if product.image_url %}
+                                <img src="{{ product.image_url }}" alt="{{ product.name }}">
+                            {% else %}
+                                <div class="summary-placeholder">📦</div>
+                            {% endif %}
+                        </div>
+                        <div class="summary-details">
+                            <h4>{{ product.name }}</h4>
+                            <p class="summary-price">₹{{ "%.2f"|format(product.price) }}</p>
+                            <p class="summary-qty">Quantity: {{ quantity }}</p>
+                            <p class="summary-subtotal"><strong>Subtotal: ₹{{ "%.2f"|format(product.price * quantity) }}</strong></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="checkout-card checkout-section" id="select-address-section">
+                    <h3>Select Delivery Address</h3>
+                    {% if addresses %}
+                    <div class="address-select-grid" id="address-select-grid">
+                        {% for addr in addresses %}
+                        <div class="address-select-card{% if addr.id == default_address_id %} selected{% endif %}" data-address-id="{{ addr.id }}" data-shipping="{{ addr.to_shipping_string()|e }}">
+                            {% if addr.is_default %}
+                            <span class="address-badge default-badge">Default</span>
+                            {% endif %}
+                            <div class="address-select-body">
+                                <p class="addr-name">{{ addr.full_name }}</p>
+                                <p class="addr-line">{{ addr.street_address }}</p>
+                                <p class="addr-line">{{ addr.city }}, {{ addr.state }} - {{ addr.pincode }}</p>
+                                <p class="addr-phone">Phone: {{ addr.phone }}</p>
+                            </div>
+                            <button type="button" class="btn-deliver-here">Deliver Here</button>
+                            <span class="selected-check" style="display:none;">✔ Selected</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <a href="#" class="btn-add-address-inline" id="btn-add-address-modal">+ Add New Address</a>
+                    {% else %}
+                    <p class="no-addresses-msg">You don't have any saved addresses. Add one below or <a href="{{ url_for('profile_address_add') }}">manage addresses</a>.</p>
+                    {% endif %}
+                </div>
+
+                <div class="checkout-card checkout-section address-form-section{% if addresses %} manual-fallback{% endif %}" id="manual-address-section">
+                    <h3>{{ 'Enter Delivery Address' if addresses else 'Delivery Address' }}</h3>
+                    <p class="section-hint">Or enter a new address manually below.</p>
+
+                    <div class="form-group">
+                        <label for="addr_full_name">Full Name <span class="required">*</span></label>
+                        <input type="text" id="addr_full_name" name="addr_full_name" value="{{ user.full_name or '' }}" placeholder="Your full name">
+                    </div>
+                    <div class="form-group">
+                        <label for="addr_email">Email</label>
+                        <input type="email" id="addr_email" value="{{ user.email }}" readonly class="input-readonly" title="Email cannot be changed at checkout">
+                    </div>
+                    <div class="form-group">
+                        <label for="addr_phone">Phone Number <span class="required">*</span></label>
+                        <input type="tel" id="addr_phone" name="addr_phone" value="{{ user.phone or '' }}" placeholder="10-digit mobile number">
+                    </div>
+                    <div class="form-group form-group-full">
+                        <label for="addr_street">Street Address <span class="required">*</span></label>
+                        <input type="text" id="addr_street" name="addr_street" placeholder="House No, Street, Area">
+                    </div>
+                    <div class="address-row">
+                        <div class="form-group">
+                            <label for="addr_city">City / Town <span class="required">*</span></label>
+                            <input type="text" id="addr_city" name="addr_city" placeholder="City or town">
+                        </div>
+                        <div class="form-group">
+                            <label for="addr_state">State <span class="required">*</span></label>
+                            <input type="text" id="addr_state" name="addr_state" placeholder="State">
+                        </div>
+                    </div>
+                    <div class="address-row">
+                        <div class="form-group">
+                            <label for="addr_pincode">PIN Code <span class="required">*</span></label>
+                            <input type="text" id="addr_pincode" name="addr_pincode" maxlength="6" inputmode="numeric" placeholder="6-digit PIN">
+                            <span class="field-error" id="pincode-error"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="addr_country">Country</label>
+                            <input type="text" id="addr_country" name="addr_country" value="India" placeholder="Country">
+                        </div>
+                    </div>
+                    <div class="form-group form-group-full">
+                        <label for="addr_landmark">Landmark <span class="muted">(optional)</span></label>
+                        <input type="text" id="addr_landmark" name="addr_landmark" placeholder="Near Post Office / Temple">
+                    </div>
+                    <div class="address-preview-card">
+                        <h4>Delivery Address Preview</h4>
+                        <div id="address-preview" class="address-preview-content">
+                            <span class="preview-empty">Select an address above or fill the form</span>
+                        </div>
+                    </div>
+                    <div class="form-group form-group-full">
+                        <label for="shipment_notes">Shipment Notes <span class="muted">(optional)</span></label>
+                        <textarea id="shipment_notes" name="shipment_notes" rows="2" placeholder="Any special delivery instructions..."></textarea>
+                    </div>
+                    <div class="form-group form-group-full save-address-option">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="save_address" id="save_address" value="true">
+                            <span class="checkbox-custom"></span>
+                            Save this address for future orders
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="checkout-sidebar">
+                <div class="checkout-card checkout-order-card">
+                    <h3>Order Total</h3>
+                    <p class="order-total">₹{{ "%.2f"|format(product.price * quantity) }}</p>
+                    <p id="razorpay-error" class="razorpay-error" style="display:none;"></p>
+                    <button type="submit" class="btn-place-order" id="place-order-btn"{% if not addresses %} disabled{% endif %}>
+                        <span class="btn-text">{% if razorpay_key_id %}Pay Now{% else %}Place Order{% endif %}</span>
+                        <span class="btn-loading" style="display:none;"><span class="spinner"></span> Processing...</span>
+                    </button>
+                    <p class="form-validate-hint" id="form-validate-hint">{% if addresses %}Select or enter an address to place order{% else %}Complete all required fields to place order{% endif %}</p>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Add Address Modal -->
+<div id="address-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Add New Address</h3>
+            <button type="button" class="modal-close" id="modal-close">&times;</button>
+        </div>
+        <form id="modal-address-form" class="address-form-inline">
+            <div class="form-group">
+                <label>Full Name <span class="required">*</span></label>
+                <input type="text" name="full_name" required placeholder="Your full name">
+            </div>
+            <div class="form-group">
+                <label>Phone <span class="required">*</span></label>
+                <input type="tel" name="phone" required maxlength="10" placeholder="10-digit mobile">
+                <span class="field-error" id="modal-phone-error"></span>
+            </div>
+            <div class="form-group">
+                <label>Street Address <span class="required">*</span></label>
+                <input type="text" name="street_address" required placeholder="House No, Street, Area">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>City <span class="required">*</span></label>
+                    <input type="text" name="city" required placeholder="City">
+                </div>
+                <div class="form-group">
+                    <label>State <span class="required">*</span></label>
+                    <input type="text" name="state" required placeholder="State">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>PIN Code <span class="required">*</span></label>
+                    <input type="text" name="pincode" required maxlength="6" placeholder="6-digit PIN">
+                    <span class="field-error" id="modal-pincode-error"></span>
+                </div>
+                <div class="form-group">
+                    <label>Country</label>
+                    <input type="text" name="country" value="India" placeholder="Country">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Landmark <span class="muted">(optional)</span></label>
+                <input type="text" name="landmark" placeholder="Near Post Office / Temple">
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Save Address</button>
+        </form>
+    </div>
+</div>
+
+<script>
+window.CHECKOUT_CONFIG = {
+    razorpayKeyId: {{ razorpay_key_id|tojson }},
+    businessName: 'Abound NextGen E Hub',
+    userName: {{ (user.full_name or '')|tojson }},
+    userEmail: {{ (user.email or '')|tojson }},
+    userPhone: {{ (user.phone or '')|tojson }},
+    razorpayEnabled: {{ (razorpay_key_id != '')|tojson }}
+};
+</script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="{{ url_for('static', filename='js/razorpay-checkout.js') }}?v=1"></script>
+
+<script>
+(function() {
+    var form = document.getElementById('checkout-form');
+    var hiddenAddress = document.getElementById('shipping_address_hidden');
+    var selectedAddressId = document.getElementById('selected_address_id');
+    var placeOrderBtn = document.getElementById('place-order-btn');
+    var validateHint = document.getElementById('form-validate-hint');
+    var addressCards = document.querySelectorAll('.address-select-card');
+    var manualSection = document.getElementById('manual-address-section');
+    var addrFields = ['addr_full_name', 'addr_phone', 'addr_street', 'addr_city', 'addr_state', 'addr_pincode', 'addr_country', 'addr_landmark'];
+    var pincodeInput = document.getElementById('addr_pincode');
+    var pincodeError = document.getElementById('pincode-error');
+    var previewEl = document.getElementById('address-preview');
+    var modal = document.getElementById('address-modal');
+    var modalForm = document.getElementById('modal-address-form');
+    var btnAddModal = document.getElementById('btn-add-address-modal');
+
+    var useSavedAddress = !!selectedAddressId.value;
+
+    function isValidPincode(val) { return /^[0-9]{6}$/.test((val || '').trim()); }
+    function isValidPhone(val) { return /^[0-9]{10}$/.test((val || '').trim()); }
+
+    function selectAddressCard(card) {
+        addressCards.forEach(function(c) {
+            c.classList.remove('selected');
+            c.querySelector('.selected-check').style.display = 'none';
+            c.querySelector('.btn-deliver-here').style.display = 'inline-block';
+        });
+        card.classList.add('selected');
+        card.querySelector('.selected-check').style.display = 'inline';
+        card.querySelector('.btn-deliver-here').style.display = 'none';
+        selectedAddressId.value = card.dataset.addressId;
+        hiddenAddress.value = card.dataset.shipping;
+        useSavedAddress = true;
+        previewEl.innerHTML = (card.dataset.shipping || '').replace(/\n/g, '<br>');
+        placeOrderBtn.disabled = false;
+        validateHint.style.display = 'none';
+    }
+
+    if (addressCards.length) {
+        addressCards.forEach(function(card) {
+            card.querySelector('.btn-deliver-here').addEventListener('click', function() {
+                selectAddressCard(card);
+            });
+            if (card.classList.contains('selected')) {
+                card.querySelector('.selected-check').style.display = 'inline';
+                card.querySelector('.btn-deliver-here').style.display = 'none';
+                hiddenAddress.value = card.dataset.shipping;
+                previewEl.innerHTML = (card.dataset.shipping || '').replace(/\n/g, '<br>');
+            }
+        });
+    }
+
+    function buildFormattedAddress() {
+        var name = (document.getElementById('addr_full_name')?.value || '').trim();
+        var phone = (document.getElementById('addr_phone')?.value || '').trim();
+        var street = (document.getElementById('addr_street')?.value || '').trim();
+        var landmark = (document.getElementById('addr_landmark')?.value || '').trim();
+        var city = (document.getElementById('addr_city')?.value || '').trim();
+        var state = (document.getElementById('addr_state')?.value || '').trim();
+        var pincode = (document.getElementById('addr_pincode')?.value || '').trim();
+        var country = (document.getElementById('addr_country')?.value || 'India').trim() || 'India';
+        var lines = [];
+        if (name) lines.push(name);
+        if (street) lines.push(street);
+        if (landmark) lines.push(landmark);
+        if (city || state || pincode) lines.push([city, state].filter(Boolean).join(', ') + (pincode ? ' - ' + pincode : ''));
+        if (country) lines.push(country);
+        if (phone) lines.push('Phone: ' + phone);
+        return lines.join('\n');
+    }
+
+    function updateFromManualForm() {
+        useSavedAddress = false;
+        selectedAddressId.value = '';
+        var addr = buildFormattedAddress();
+        hiddenAddress.value = addr;
+        if (!addr.trim()) {
+            previewEl.innerHTML = '<span class="preview-empty">Select an address above or fill the form</span>';
+        } else {
+            previewEl.innerHTML = addr.replace(/\n/g, '<br>');
+        }
+        updateFormState();
+    }
+
+    function updateFormState() {
+        var valid;
+        if (useSavedAddress) valid = true;
+        else valid = (document.getElementById('addr_full_name')?.value || '').trim().length > 0 &&
+            isValidPhone((document.getElementById('addr_phone')?.value || '').trim()) &&
+            (document.getElementById('addr_street')?.value || '').trim().length > 0 &&
+            (document.getElementById('addr_city')?.value || '').trim().length > 0 &&
+            (document.getElementById('addr_state')?.value || '').trim().length > 0 &&
+            isValidPincode((document.getElementById('addr_pincode')?.value || '').trim());
+        placeOrderBtn.disabled = !valid;
+        validateHint.style.display = valid ? 'none' : 'block';
+    }
+    window.updateCheckoutFormState = updateFormState;
+
+    addrFields.forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('input', function() {
+            if (el.id === 'addr_full_name' || el.id === 'addr_phone' || el.id === 'addr_street' || el.id === 'addr_city' || el.id === 'addr_state' || el.id === 'addr_pincode') useSavedAddress = false;
+            updateFromManualForm();
+        });
+    });
+
+    if (pincodeInput) {
+        pincodeInput.addEventListener('input', function() {
+            this.value = this.value.replace(/\D/g, '').slice(0, 6);
+        });
+    }
+
+    form.addEventListener('submit', function(e) {
+        if (useSavedAddress) {
+            hiddenAddress.value = document.querySelector('.address-select-card.selected')?.dataset.shipping || '';
+        } else {
+            hiddenAddress.value = buildFormattedAddress();
+            selectedAddressId.value = '';
+        }
+        if (!hiddenAddress.value.trim()) {
+            e.preventDefault();
+            return false;
+        }
+        if (window.CHECKOUT_CONFIG && window.CHECKOUT_CONFIG.razorpayEnabled) {
+            e.preventDefault();
+            if (typeof window.startRazorpayCheckout === 'function') {
+                window.startRazorpayCheckout(form);
+            }
+            return false;
+        }
+        placeOrderBtn.querySelector('.btn-text').style.display = 'none';
+        placeOrderBtn.querySelector('.btn-loading').style.display = 'inline-flex';
+        placeOrderBtn.disabled = true;
+    });
+
+    if (!addressCards.length) {
+        updateFromManualForm();
+    }
+
+    if (btnAddModal) {
+        btnAddModal.addEventListener('click', function(e) {
+            e.preventDefault();
+            modal.classList.add('open');
+            modal.setAttribute('aria-hidden', 'false');
+        });
+    }
+    document.getElementById('modal-close').addEventListener('click', function() {
+        modal.classList.remove('open');
+        modal.setAttribute('aria-hidden', 'true');
+    });
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) modal.classList.remove('open');
+    });
+
+    modalForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var fd = new FormData(modalForm);
+        var data = Object.fromEntries(fd);
+        data.phone = (data.phone || '').replace(/\D/g, '').slice(0, 10);
+        data.pincode = (data.pincode || '').replace(/\D/g, '').slice(0, 6);
+        if (!/^[0-9]{10}$/.test(data.phone)) {
+            document.getElementById('modal-phone-error').textContent = 'Please enter a valid 10-digit phone number.';
+            return;
+        }
+        if (!/^[0-9]{6}$/.test(data.pincode)) {
+            document.getElementById('modal-pincode-error').textContent = 'Please enter a valid 6-digit PIN code.';
+            return;
+        }
+        document.getElementById('modal-phone-error').textContent = '';
+        document.getElementById('modal-pincode-error').textContent = '';
+        fetch('/api/addresses', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        }).then(function(r) { return r.json(); }).then(function(res) {
+            if (res.success) {
+                modal.classList.remove('open');
+                modalForm.reset();
+                var grid = document.getElementById('address-select-grid');
+                var card = document.createElement('div');
+                card.className = 'address-select-card selected';
+                card.dataset.addressId = res.address.id;
+                card.dataset.shipping = res.address.shipping_string;
+                card.innerHTML = '<span class="address-badge default-badge" style="' + (res.address.is_default ? '' : 'display:none') + '">Default</span><div class="address-select-body"><p class="addr-name">' + (res.address.full_name || '') + '</p><p class="addr-line">' + (res.address.street_address || '') + '</p><p class="addr-line">' + (res.address.city || '') + ', ' + (res.address.state || '') + ' - ' + (res.address.pincode || '') + '</p><p class="addr-phone">Phone: ' + (res.address.phone || '') + '</p></div><button type="button" class="btn-deliver-here" style="display:none">Deliver Here</button><span class="selected-check">✔ Selected</span>';
+                card.querySelector('.btn-deliver-here').addEventListener('click', function() { selectAddressCard(card); });
+                if (grid) {
+                    var first = grid.querySelector('.address-select-card');
+                    if (first) grid.insertBefore(card, first);
+                    else grid.appendChild(card);
+                } else {
+                    var sec = document.getElementById('select-address-section');
+                    document.querySelector('.no-addresses-msg')?.remove();
+                    var newGrid = document.createElement('div');
+                    newGrid.className = 'address-select-grid';
+                    newGrid.id = 'address-select-grid';
+                    newGrid.appendChild(card);
+                    sec.appendChild(newGrid);
+                    var addBtn = document.getElementById('btn-add-address-modal');
+                    if (!addBtn) {
+                        addBtn = document.createElement('a');
+                        addBtn.href = '#';
+                        addBtn.className = 'btn-add-address-inline';
+                        addBtn.id = 'btn-add-address-modal';
+                        addBtn.textContent = '+ Add New Address';
+                        addBtn.addEventListener('click', function(ev) { ev.preventDefault(); modal.classList.add('open'); });
+                        sec.appendChild(addBtn);
+                    }
+                }
+                addressCards = document.querySelectorAll('.address-select-card');
+                selectAddressCard(card);
+            } else {
+                alert(res.error || 'Failed to save address.');
+            }
+        }).catch(function() { alert('Failed to save address.'); });
+    });
+
+    modalForm.querySelector('input[name="phone"]').addEventListener('input', function() {
+        this.value = this.value.replace(/\D/g, '').slice(0, 10);
+    });
+    modalForm.querySelector('input[name="pincode"]').addEventListener('input', function() {
+        this.value = this.value.replace(/\D/g, '').slice(0, 6);
+    });
+})();
+</script>
+{% endblock %}

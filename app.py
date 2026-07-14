@@ -2938,19 +2938,32 @@ def api_team_tree():
         return {'id': u.id, 'name': u.full_name, 'level': u.level_name, 'ref_id': u.referral_id or '', 'children': [build_tree(c) for c in sales_children]}
     return jsonify(build_tree(user))
 
-if __name__ == '__main__':
-    with app.app_context():
-        migrate_db()
-        
-        # Create some sample products if none exist
-        if Product.query.count() == 0:
-            sample_products = [
-                Product(name='Premium Package A', description='Complete sales solution package', price=299.99),
-                Product(name='Premium Package B', description='Advanced features package', price=499.99),
-                Product(name='Enterprise Package', description='Full enterprise solution', price=999.99),
-            ]
-            for product in sample_products:
-                db.session.add(product)
-            db.session.commit()
-    
-    app.run(debug=True, host='0.0.0.0', port=5001)
+# Initialize database when the application is imported
+with app.app_context():
+    migrate_db()
+
+    # Create sample products if database is empty
+    if Product.query.count() == 0:
+        sample_products = [
+            Product(
+                name='Premium Package A',
+                description='Complete sales solution package',
+                price=299.99
+            ),
+            Product(
+                name='Premium Package B',
+                description='Advanced features package',
+                price=499.99
+            ),
+            Product(
+                name='Enterprise Package',
+                description='Full enterprise solution',
+                price=999.99
+            ),
+        ]
+
+        db.session.add_all(sample_products)
+        db.session.commit()
+
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=5001)

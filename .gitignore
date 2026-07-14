@@ -28,9 +28,9 @@ instance/
 .webassets-cache
 
 # Database
-*.db
-*.sqlite
-*.sqlite3
+#*.db
+#*.sqlite
+#*.sqlite3
 
 # Environment variables
 .env

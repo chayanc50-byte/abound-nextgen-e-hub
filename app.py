@@ -11,6 +11,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from sqlalchemy import text, or_
 from dotenv import load_dotenv
+from integrations.resend_email import send_email
 
 import hierarchy as hierarchy_config
 
@@ -83,100 +84,105 @@ def generate_referral_id():
     raise ValueError('Could not generate unique referral ID')
 
 def send_welcome_email(user):
-    """Send welcome email to new registrants (register, onboard, setup, admin create)."""
-    if not app.config.get('MAIL_USERNAME') or not app.config.get('MAIL_PASSWORD'):
-        app.logger.warning('Email not configured (MAIL_USERNAME/MAIL_PASSWORD) - skipping welcome email')
-        return False
+    """Send welcome email to new registrants."""
+
     try:
-        app_url = app.config.get('APP_URL', 'http://localhost:5001')
-        body = render_template('email_welcome.html',
+        app_url = app.config.get(
+            "APP_URL",
+            "https://aboundehub.com"
+        )
+
+        body = render_template(
+            "email_welcome.html",
             full_name=user.full_name,
             username=user.username,
             referral_id=user.referral_id,
-            app_url=app_url
+            app_url=app_url,
         )
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = 'Welcome to Abound Next-Gen E-Hub - Your Account Details'
-        msg['From'] = app.config.get('MAIL_FROM', 'noreply@abound.com')
-        msg['To'] = user.email
-        msg.attach(MIMEText(body, 'html'))
-        with smtplib.SMTP(app.config['MAIL_SERVER'], app.config['MAIL_PORT'], timeout=10) as server:
-            if app.config.get('MAIL_USE_TLS', True):
-                server.starttls()
-            server.login(app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD'])
-            server.send_message(msg)
-        app.logger.info(f'Welcome email sent to {user.email}')
-        return True
+
+        return send_email(
+            to=user.email,
+            subject="Welcome to Abound Next-Gen E-Hub - Your Account Details",
+            html=body,
+        )
+
     except Exception as e:
-        app.logger.error(f'Failed to send welcome email to {user.email}: {e}')
+        app.logger.exception(
+            f"Failed to prepare welcome email: {e}"
+        )
         return False
 
 def send_order_notification(order):
     """Email admin when order is placed."""
-    if not app.config['MAIL_USERNAME'] or not app.config['MAIL_PASSWORD']:
-        return False
-    admins = User.query.filter(User.user_role.in_(['admin', 'super_admin'])).all()
+
+    admins = User.query.filter(
+        User.user_role.in_(["admin", "super_admin"])
+    ).all()
+
     if not admins:
         return False
+
     try:
-        body = render_template('email_order_notification.html', order=order, app_url=app.config['APP_URL'])
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = f'New Order #{order.id} - Abound Next-Gen E-Hub'
-        msg['From'] = app.config['MAIL_FROM']
-        msg['To'] = ','.join(a.email for a in admins)
-        msg.attach(MIMEText(body, 'html'))
-        with smtplib.SMTP(app.config['MAIL_SERVER'], app.config['MAIL_PORT'], timeout=10) as server:
-            if app.config['MAIL_USE_TLS']:
-                server.starttls()
-            server.login(app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD'])
-            server.send_message(msg)
-        return True
+
+        body = render_template(
+            "email_order_notification.html",
+            order=order,
+            app_url=app.config["APP_URL"],
+        )
+
+        return send_email(
+            to=[a.email for a in admins],
+            subject=f"New Order #{order.id} - Abound Next-Gen E-Hub",
+            html=body,
+        )
+
     except Exception as e:
-        app.logger.error(f'Failed to send order notification: {e}')
+        app.logger.exception(e)
         return False
 
 def send_order_confirmation_buyer(order):
-    """Email buyer when order is placed (order confirmation)."""
-    if not app.config.get('MAIL_USERNAME') or not app.config.get('MAIL_PASSWORD'):
-        return False
+    """Email buyer when order is placed."""
+
     try:
-        body = render_template('email_order_confirmation_buyer.html', order=order, app_url=app.config['APP_URL'])
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = f'Order Confirmation #{order.id} - Abound NextGen E Hub'
-        msg['From'] = app.config.get('MAIL_FROM', 'noreply@abound.com')
-        msg['To'] = order.user.email
-        msg.attach(MIMEText(body, 'html'))
-        with smtplib.SMTP(app.config['MAIL_SERVER'], app.config['MAIL_PORT'], timeout=10) as server:
-            if app.config.get('MAIL_USE_TLS', True):
-                server.starttls()
-            server.login(app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD'])
-            server.send_message(msg)
-        app.logger.info(f'Order confirmation email sent to buyer {order.user.email}')
-        return True
+
+        body = render_template(
+            "email_order_confirmation_buyer.html",
+            order=order,
+            app_url=app.config["APP_URL"],
+        )
+
+        return send_email(
+            to=order.user.email,
+            subject=f"Order Confirmation #{order.id} - Abound Next-Gen E-Hub",
+            html=body,
+        )
+
     except Exception as e:
-        app.logger.error(f'Failed to send order confirmation email to buyer: {e}')
+        app.logger.exception(e)
         return False
+
 
 def send_order_shipped_buyer(order):
     """Email buyer when order is shipped."""
-    if not app.config.get('MAIL_USERNAME') or not app.config.get('MAIL_PASSWORD'):
-        return False
+
     try:
-        body = render_template('email_order_shipped_buyer.html', order=order, app_url=app.config['APP_URL'])
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = 'Your Order Has Been Shipped - Abound NextGen E Hub'
-        msg['From'] = app.config.get('MAIL_FROM', 'noreply@abound.com')
-        msg['To'] = order.user.email
-        msg.attach(MIMEText(body, 'html'))
-        with smtplib.SMTP(app.config['MAIL_SERVER'], app.config['MAIL_PORT'], timeout=10) as server:
-            if app.config.get('MAIL_USE_TLS', True):
-                server.starttls()
-            server.login(app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD'])
-            server.send_message(msg)
-        return True
+
+        body = render_template(
+            "email_order_shipped_buyer.html",
+            order=order,
+            app_url=app.config["APP_URL"],
+        )
+
+        return send_email(
+            to=order.user.email,
+            subject="Your Order Has Been Shipped - Abound Next-Gen E-Hub",
+            html=body,
+        )
+
     except Exception as e:
-        app.logger.error(f'Failed to send order shipped email to buyer: {e}')
+        app.logger.exception(e)
         return False
+
 
 def send_push_notification(user_ids, title, body, click_action=None, icon=None):
     """Send FCM push notification to users. user_ids can be int or list of ints."""

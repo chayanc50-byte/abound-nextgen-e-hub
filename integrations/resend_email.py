@@ -13,13 +13,13 @@ def send_email(to, subject, html):
 
     payload = {
         "from": os.environ.get(
-            "MAIL_FROM",
-            "noreply@aboundehub.com"
+    "MAIL_FROM",
+    "Abound Next-Gen E-Hub <noreply@aboundehub.com>"
         ),
-       "to": to if isinstance(to, list) else [to],
+       "to": to if isinstance(to, list) else [to],,
         "subject": subject,
         "html": html,
-    
+    }
 
     headers = {
         "Authorization": f"Bearer {api_key}",

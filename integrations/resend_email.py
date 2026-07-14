@@ -1,5 +1,6 @@
 import os
 import requests
+from flask import current_app
 
 RESEND_API_URL = "https://api.resend.com/emails"
 
@@ -8,15 +9,15 @@ def send_email(to, subject, html):
     api_key = os.environ.get("RESEND_API_KEY")
 
     if not api_key:
-        print("RESEND_API_KEY is not configured.")
+        current_app.logger.error("RESEND_API_KEY is not configured.")
         return False
 
     payload = {
         "from": os.environ.get(
-    "MAIL_FROM",
-    "Abound Next-Gen E-Hub <noreply@aboundehub.com>"
+            "MAIL_FROM",
+            "Abound Next-Gen E-Hub <noreply@aboundehub.com>"
         ),
-       "to": to if isinstance(to, list) else [to],,
+        "to": to if isinstance(to, list) else [to],
         "subject": subject,
         "html": html,
     }
@@ -26,18 +27,25 @@ def send_email(to, subject, html):
         "Content-Type": "application/json",
     }
 
-    response = requests.post(
-        RESEND_API_URL,
-        json=payload,
-        headers=headers,
-        timeout=20,
-    )
+    try:
+        response = requests.post(
+            RESEND_API_URL,
+            json=payload,
+            headers=headers,
+            timeout=20,
+        )
 
-    if response.status_code in (200, 202):
-        return True
+        if response.ok:
+            current_app.logger.info(f"Email sent successfully to {to}")
+            return True
 
-    print("Resend Error")
-    print(response.status_code)
-    print(response.text)
+        current_app.logger.error(
+            f"Resend Error {response.status_code}: {response.text}"
+        )
+        return False
 
-    return False
+    except Exception as e:
+        current_app.logger.exception(
+            f"Failed to send email: {e}"
+        )
+        return False

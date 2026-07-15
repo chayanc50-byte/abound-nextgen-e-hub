@@ -6,9 +6,6 @@ from datetime import datetime
 import os
 import random
 import string
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from sqlalchemy import text, or_
 from dotenv import load_dotenv
 from integrations.resend_email import send_email
@@ -224,53 +221,35 @@ def send_push_notification(user_ids, title, body, click_action=None, icon=None):
 
 def send_order_shipped_admin(order):
     """Email admins when order is shipped."""
-    if not app.config.get('MAIL_USERNAME') or not app.config.get('MAIL_PASSWORD'):
-        return False
     admins = User.query.filter(User.user_role.in_(['admin', 'super_admin'])).all()
     if not admins:
         return False
     try:
         body = render_template('email_order_shipped_admin.html', order=order, app_url=app.config['APP_URL'])
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = f'Order Shipped Notification #{order.id} - Abound NextGen E Hub'
-        msg['From'] = app.config.get('MAIL_FROM', 'noreply@abound.com')
-        msg['To'] = ','.join(a.email for a in admins)
-        msg.attach(MIMEText(body, 'html'))
-        with smtplib.SMTP(app.config['MAIL_SERVER'], app.config['MAIL_PORT'], timeout=10) as server:
-            if app.config.get('MAIL_USE_TLS', True):
-                server.starttls()
-            server.login(app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD'])
-            server.send_message(msg)
-        return True
+        return send_email(
+            to=[a.email for a in admins],
+            subject=f'Order Shipped Notification #{order.id} - Abound NextGen E Hub',
+            html=body,
+        )
     except Exception as e:
         app.logger.error(f'Failed to send order shipped notification to admin: {e}')
         return False
 
 def send_credentials_email(user, password):
     """Email login credentials to user (e.g. when admin creates user with auto-generated password)."""
-    if not app.config['MAIL_USERNAME'] or not app.config['MAIL_PASSWORD']:
-        return False
     try:
         body = render_template('email_credentials.html', user=user, password=password, app_url=app.config['APP_URL'])
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = 'Your Abound Next-Gen E-Hub Login Credentials'
-        msg['From'] = app.config['MAIL_FROM']
-        msg['To'] = user.email
-        msg.attach(MIMEText(body, 'html'))
-        with smtplib.SMTP(app.config['MAIL_SERVER'], app.config['MAIL_PORT'], timeout=10) as server:
-            if app.config['MAIL_USE_TLS']:
-                server.starttls()
-            server.login(app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD'])
-            server.send_message(msg)
-        return True
+        return send_email(
+            to=user.email,
+            subject='Your Abound Next-Gen E-Hub Login Credentials',
+            html=body,
+        )
     except Exception as e:
         app.logger.error(f'Failed to send credentials email: {e}')
         return False
 
 def send_notification_email(to_email, title, message, click_action=None):
     """Send admin announcement email to a single recipient."""
-    if not app.config.get('MAIL_USERNAME') or not app.config.get('MAIL_PASSWORD'):
-        return False
     try:
         app_url = app.config.get('APP_URL', 'http://localhost:5001').rstrip('/')
         body = render_template('email_notification.html',
@@ -279,25 +258,17 @@ def send_notification_email(to_email, title, message, click_action=None):
             click_action=click_action,
             app_url=app_url
         )
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = f'{title} - Abound NextGen E Hub'
-        msg['From'] = app.config.get('MAIL_FROM', 'noreply@abound.com')
-        msg['To'] = to_email
-        msg.attach(MIMEText(body, 'html'))
-        with smtplib.SMTP(app.config['MAIL_SERVER'], app.config['MAIL_PORT'], timeout=10) as server:
-            if app.config.get('MAIL_USE_TLS', True):
-                server.starttls()
-            server.login(app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD'])
-            server.send_message(msg)
-        return True
+        return send_email(
+            to=to_email,
+            subject=f'{title} - Abound NextGen E Hub',
+            html=body,
+        )
     except Exception as e:
         app.logger.error(f'Failed to send notification email to {to_email}: {e}')
         return False
 
 def send_contact_form_email(name, email, subject, message):
     """Send contact form submission to support email."""
-    if not app.config['MAIL_USERNAME'] or not app.config['MAIL_PASSWORD']:
-        return False
     support_email = 'aboundehub@gmail.com'
     try:
         body = f"""New Contact Form Message
@@ -309,18 +280,12 @@ Subject: {subject}
 Message:
 {message}
 """
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = 'New Contact Form Message'
-        msg['From'] = app.config['MAIL_FROM']
-        msg['To'] = support_email
-        msg['Reply-To'] = email
-        msg.attach(MIMEText(body, 'plain'))
-        with smtplib.SMTP(app.config['MAIL_SERVER'], app.config['MAIL_PORT'], timeout=10) as server:
-            if app.config['MAIL_USE_TLS']:
-                server.starttls()
-            server.login(app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD'])
-            server.send_message(msg)
-        return True
+        html = f'<pre>{body}</pre>'
+        return send_email(
+            to=support_email,
+            subject='New Contact Form Message',
+            html=html,
+        )
     except Exception as e:
         app.logger.error(f'Failed to send contact form email: {e}')
         return False
@@ -1882,14 +1847,14 @@ def email_test():
     if not user:
         return redirect(url_for('login'))
     
-    config_ok = bool(app.config['MAIL_USERNAME'] and app.config['MAIL_PASSWORD'])
+    config_ok = bool(os.environ.get('RESEND_API_KEY'))
     
     if request.method == 'POST':
         error_msg = None
         success = False
         try:
             if not config_ok:
-                error_msg = 'Email not configured. Add MAIL_USERNAME and MAIL_PASSWORD to your .env file.'
+                error_msg = 'Email not configured. Add RESEND_API_KEY to your .env file.'
             else:
                 body = render_template('email_welcome.html',
                     full_name=user.full_name,
@@ -1897,21 +1862,13 @@ def email_test():
                     referral_id=user.referral_id or '',
                     app_url=app.config['APP_URL']
                 )
-                msg = MIMEMultipart('alternative')
-                msg['Subject'] = 'Welcome to Abound Next-Gen E-Hub - Your Account Details'
-                msg['From'] = app.config['MAIL_FROM']
-                msg['To'] = user.email
-                msg.attach(MIMEText(body, 'html'))
-                with smtplib.SMTP(app.config['MAIL_SERVER'], app.config['MAIL_PORT'], timeout=10) as server:
-                    if app.config['MAIL_USE_TLS']:
-                        server.starttls()
-                    server.login(app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD'])
-                    server.send_message(msg)
-                success = True
-        except smtplib.SMTPAuthenticationError as e:
-            error_msg = f'Authentication failed: {e}. For Gmail, use an App Password (not your regular password). Go to Google Account → Security → App passwords.'
-        except smtplib.SMTPException as e:
-            error_msg = f'SMTP error: {e}'
+                success = send_email(
+                    to=user.email,
+                    subject='Welcome to Abound Next-Gen E-Hub - Your Account Details',
+                    html=body,
+                )
+                if not success:
+                    error_msg = 'Resend email failed. Check application logs for the provider response.'
         except Exception as e:
             error_msg = f'{type(e).__name__}: {e}'
         

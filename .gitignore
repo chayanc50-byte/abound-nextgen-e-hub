@@ -51,3 +51,7 @@ secrets/
 # OS
 .DS_Store
 Thumbs.db
+
+# Release APK artifact
+!static/downloads/
+!static/downloads/abound-ehub.apk

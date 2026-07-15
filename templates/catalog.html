@@ -6,7 +6,7 @@
 <section class="section catalog-hero">
     <div class="container">
         <h1 class="page-title">Our Products</h1>
-        <p class="page-subtitle">Quality products for your home and business. <a href="{{ url_for('login') }}">Login</a> or <a href="{{ url_for('register') }}">Register</a> to purchase.</p>
+        <p class="page-subtitle">Quality products for your home and business. <a href="{{ url_for('login') }}">Login</a> or <a href="{{ url_for('register') }}">Register</a> to purchase as a Sales Member, or buy directly as a Retail Customer!</p>
     </div>
 </section>
 
@@ -14,7 +14,7 @@
     <div class="container">
         <div class="products-grid public-products">
             {% for product in products %}
-            <a href="{{ url_for('login') }}" class="product-card-link">
+            <div class="product-card-wrapper">
                 <div class="product-card">
                     <div class="product-image">
                         {% if product.image_url %}
@@ -27,10 +27,17 @@
                         <h3>{{ product.name }}</h3>
                         {% if product.description %}<p class="product-description">{{ product.description[:80] }}{% if product.description|length > 80 %}...{% endif %}</p>{% endif %}
                         <p class="product-price">₹{{ "%.2f"|format(product.price) }}</p>
-                        {% if product.is_out_of_stock %}<p class="out-of-stock">Out of Stock</p>{% else %}<span class="btn btn-primary btn-sm">Login to Buy</span>{% endif %}
+                        {% if product.is_out_of_stock %}
+                        <p class="out-of-stock">Out of Stock</p>
+                        {% else %}
+                        <div class="product-buttons">
+                            <a href="{{ url_for('login') }}" class="btn btn-secondary btn-sm">Login to Buy</a>
+                            <a href="{{ url_for('retail_checkout', product_id=product.id) }}" class="btn btn-primary btn-sm">Buy Now (Retail)</a>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
-            </a>
+            </div>
             {% endfor %}
         </div>
         {% if not products %}
@@ -41,4 +48,19 @@
         {% endif %}
     </div>
 </section>
+
+<style>
+.product-card-wrapper {
+    display: block;
+}
+.product-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+.product-buttons .btn {
+    flex: 1;
+    text-align: center;
+}
+</style>
 {% endblock %}

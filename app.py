@@ -41,6 +41,10 @@ app.config['FIREBASE_SERVICE_ACCOUNT_PATH'] = os.environ.get('FIREBASE_SERVICE_A
 app.config['RAZORPAY_KEY_ID'] = os.environ.get('RAZORPAY_KEY_ID', '').strip()
 app.config['RAZORPAY_KEY_SECRET'] = os.environ.get('RAZORPAY_KEY_SECRET', '').strip()
 
+# Configurable constants for retail customer system
+SAVINGS_POINT_RATE = 0.10  # 0.1 points per rupee (10 points per ₹100)
+REWARD_THRESHOLD = 5000  # Points needed to be eligible for a reward
+
 db = SQLAlchemy(app)
 
 # Firebase Admin (lazy init)
@@ -356,13 +360,15 @@ class User(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     user_status = db.Column(db.String(20), default='active')  # active, inactive, suspended
     is_admin = db.Column(db.Boolean, default=False)  # Legacy
-    user_role = db.Column(db.String(20), default='user')  # user, admin, super_admin
+    user_role = db.Column(db.String(20), default='user')  # user, admin, super_admin, customer
     phone = db.Column(db.String(20), nullable=True)
     address = db.Column(db.String(255), nullable=True)
     # Legacy: position kept for migration, maps to user_level
     position = db.Column(db.String(80), nullable=True)
+    # For retail customers: assigned sales member
+    assigned_member_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     
-    children = db.relationship('User', backref=db.backref('parent', remote_side=[id]), lazy='dynamic')
+    children = db.relationship('User', backref=db.backref('parent', remote_side=[id]), lazy='dynamic', foreign_keys='User.parent_id')
     
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
@@ -603,6 +609,29 @@ class PromotionHistory(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user = db.relationship('User', backref='promotion_history')
 
+class SavingsAccount(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, unique=True)
+    current_points = db.Column(db.Integer, default=0)
+    lifetime_points = db.Column(db.Integer, default=0)
+    eligible_since = db.Column(db.DateTime, nullable=True)
+    reward_status = db.Column(db.String(20), default='NORMAL')
+    eligibility_email_sent = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    customer = db.relationship('User', backref=db.backref('savings_account', uselist=False))
+
+class SavingsRedemption(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    points_redeemed = db.Column(db.Integer, nullable=False)
+    reward_name = db.Column(db.String(255), nullable=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    remarks = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    customer = db.relationship('User', foreign_keys=[customer_id], backref='savings_redemptions')
+    admin = db.relationship('User', foreign_keys=[admin_id], backref='processed_redemptions')
+
 def count_direct_at_level(user, level):
     """Count direct sales-user children who have the given level."""
     if level is None:
@@ -630,6 +659,14 @@ def get_or_create_wallet(user_id):
         w = Wallet(user_id=user_id)
         db.session.add(w)
     return w
+
+def get_or_create_savings_account(customer_id):
+    """Get or create savings account for retail customer."""
+    sa = SavingsAccount.query.filter_by(customer_id=customer_id).first()
+    if not sa:
+        sa = SavingsAccount(customer_id=customer_id)
+        db.session.add(sa)
+    return sa
 
 def distribute_commission(order):
     """Sponsor-based commission: buyer gets 0. Level 1=sponsor, Level 2=sponsor's upline, etc.
@@ -897,6 +934,8 @@ def dashboard():
     if not user:
         session.clear()
         return redirect(url_for('login'))
+    if user.user_role == 'customer':
+        return redirect(url_for('customer_dashboard'))  # Customers go to customer dashboard
     if user.is_admin_role:
         return redirect(url_for('admin_dashboard'))  # Admin/super_admin: admin-only view
     
@@ -906,9 +945,18 @@ def dashboard():
     orders = Order.query.filter_by(user_id=user.id).order_by(Order.created_at.desc()).limit(20).all()
     has_push_token = DeviceToken.query.filter_by(user_id=user.id).count() > 0
     
+    # Get my customers
+    my_customers = User.query.filter_by(assigned_member_id=user.id, user_role='customer').all()
+    # Add last_purchase and total_purchases to each customer
+    for customer in my_customers:
+        customer_orders = Order.query.filter_by(user_id=customer.id).order_by(Order.created_at.desc()).all()
+        customer.total_purchases = len(customer_orders)
+        customer.last_purchase = customer_orders[0].created_at if customer_orders else None
+    
     return render_template('dashboard.html', user=user, team_count=team_count,
         direct_count=direct_count, wallet=wallet, orders=orders, has_push_token=has_push_token,
-        levels=hierarchy_config.LEVELS, commission_by_level=hierarchy_config.COMMISSION_BY_LEVEL)
+        levels=hierarchy_config.LEVELS, commission_by_level=hierarchy_config.COMMISSION_BY_LEVEL,
+        my_customers=my_customers)
 
 @app.route('/products')
 def products():
@@ -1346,6 +1394,291 @@ def order_success():
     if order and order.user_id != session.get('user_id'):
         order = None
     return render_template('order_success.html', order=order)
+
+@app.route('/retail-checkout')
+def retail_checkout():
+    """Retail checkout page (no login required)."""
+    product_id = request.args.get('product_id', type=int)
+    qty = request.args.get('qty', type=int) or 1
+    if not product_id:
+        flash('Please select a product.', 'error')
+        return redirect(url_for('catalog'))
+    product = Product.query.get(product_id)
+    if not product:
+        flash('Product not found.', 'error')
+        return redirect(url_for('catalog'))
+    if product.is_out_of_stock:
+        flash('Product is out of stock.', 'error')
+        return redirect(url_for('catalog'))
+    qty = max(1, min(qty, 99))
+    # Get all active sales members for the dropdown
+    sales_members = User.query.filter_by(user_role='user', user_status='active').order_by(User.full_name).all()
+    return render_template('retail_checkout.html', product=product, quantity=qty, sales_members=sales_members,
+        razorpay_key_id=app.config.get('RAZORPAY_KEY_ID', ''))
+
+@app.route('/api/retail-checkout/prepare-pending', methods=['POST'])
+def retail_checkout_prepare_pending():
+    """Prepare pending order for retail checkout (no login required)."""
+    # First, get the customer info and selected sales member
+    product_id = request.form.get('product_id', type=int)
+    if not product_id:
+        return jsonify({'error': 'product_id is required'}), 400
+    product = Product.query.get(product_id)
+    if not product:
+        return jsonify({'error': 'Product not found'}), 404
+    if product.is_out_of_stock:
+        return jsonify({'error': 'Product is out of stock.'}), 400
+    quantity = request.form.get('quantity', 1, type=int) or 1
+    quantity = max(1, min(quantity, 99))
+    
+    # Get customer details
+    full_name = request.form.get('full_name', '').strip()
+    phone = request.form.get('phone', '').strip()
+    email = request.form.get('email', '').strip()
+    shipping_address = request.form.get('shipping_address', '').strip()
+    assigned_member_id = request.form.get('assigned_member_id', type=int)
+    
+    if not all([full_name, phone, email, shipping_address, assigned_member_id]):
+        return jsonify({'error': 'Please fill all fields'}), 400
+    
+    # Validate assigned member is an active sales user
+    assigned_member = User.query.filter_by(id=assigned_member_id, user_role='user', user_status='active').first()
+    if not assigned_member:
+        return jsonify({'error': 'Invalid sales member selected'}), 400
+    
+    # Create a temporary order or just store the data in session for now? Wait, we need to create an order but without a user yet?
+    # Wait, let's create a pending order but we need to assign user later. Wait no, let's first store all the data in session, then after payment, create the customer/order.
+    # Wait, let's store the checkout data in session, create a pending order (maybe with a temporary user? Or wait, let's create the order after payment is verified.)
+    # Alternatively, let's store all the checkout info in session, then in verify-payment, we process it. Let's do that.
+    session['retail_checkout_data'] = {
+        'product_id': product_id,
+        'quantity': quantity,
+        'full_name': full_name,
+        'phone': phone,
+        'email': email,
+        'shipping_address': shipping_address,
+        'assigned_member_id': assigned_member_id
+    }
+    
+    amount_paise = int(round(product.price * quantity * 100))
+    if amount_paise < 100:
+        return jsonify({'error': 'Amount must be at least ₹1.00 (100 paise).'}), 400
+    
+    return jsonify({
+        'amount_paise': amount_paise,
+        'receipt': f'retail_{int(datetime.utcnow().timestamp())}',
+        'product_name': product.name
+    })
+
+@app.route('/api/retail-checkout/verify-payment', methods=['POST'])
+def retail_checkout_verify_payment():
+    """Verify Razorpay payment for retail checkout, create customer account, order, and savings points."""
+    data = request.get_json(silent=True) or {}
+    payment_id = (data.get('razorpay_payment_id') or '').strip()
+    razorpay_order_id = (data.get('razorpay_order_id') or '').strip()
+    signature = (data.get('razorpay_signature') or '').strip()
+    
+    if not all([payment_id, razorpay_order_id, signature]):
+        return jsonify({'error': 'Missing payment verification fields', 'success': False}), 400
+    
+    # Verify Razorpay signature
+    key_secret = app.config.get('RAZORPAY_KEY_SECRET', '')
+    if not key_secret:
+        return jsonify({'error': 'Razorpay is not configured', 'success': False}), 500
+    
+    from integrations.razorpay_checkout import verify_payment_signature
+    if not verify_payment_signature(key_secret, razorpay_order_id, payment_id, signature):
+        return jsonify({'error': 'Invalid payment signature', 'success': False}), 400
+    
+    # Get retail checkout data from session
+    retail_data = session.pop('retail_checkout_data', None)
+    if not retail_data:
+        return jsonify({'error': 'Checkout session expired. Please try again.', 'success': False}), 400
+    
+    # Get product and check stock
+    product = Product.query.get(retail_data['product_id'])
+    if not product or product.is_out_of_stock:
+        return jsonify({'error': 'Product is no longer available.', 'success': False}), 400
+    
+    # Find or create customer account
+    customer = User.query.filter_by(email=retail_data['email']).first()
+    if not customer:
+        # Try to find by phone
+        customer = User.query.filter_by(phone=retail_data['phone']).first()
+    
+    if customer:
+        # Update customer details if needed?
+        customer.full_name = retail_data['full_name']
+        customer.phone = retail_data['phone']
+        # If customer already has an assigned member, don't change it?
+        if not customer.assigned_member_id:
+            customer.assigned_member_id = retail_data['assigned_member_id']
+    else:
+        # Create new customer account
+        # Generate a unique username
+        username_base = retail_data['email'].split('@')[0].replace('.', '_').replace('+', '_')
+        username = username_base
+        counter = 1
+        while User.query.filter_by(username=username).first():
+            username = f"{username_base}{counter}"
+            counter += 1
+        
+        # Generate a random password
+        import secrets
+        import string
+        alphabet = string.ascii_letters + string.digits
+        password = ''.join(secrets.choice(alphabet) for _ in range(12))
+        
+        customer = User(
+            username=username,
+            email=retail_data['email'],
+            password_hash=generate_password_hash(password),
+            full_name=retail_data['full_name'],
+            phone=retail_data['phone'],
+            user_role='customer',
+            assigned_member_id=retail_data['assigned_member_id'],
+            user_level=0,
+            is_active=True
+        )
+        db.session.add(customer)
+        db.session.flush()  # To get customer.id
+        
+        # Send credentials email
+        send_credentials_email(customer, password)
+    
+    # Create order
+    order = Order(
+        user_id=customer.id,
+        product_id=product.id,
+        amount=product.price,
+        quantity=retail_data['quantity'],
+        shipping_address=retail_data['shipping_address'],
+        phone=retail_data['phone'],
+        payment_status='Paid'
+    )
+    db.session.add(order)
+    
+    # Update stock
+    if product.stock_quantity is not None:
+        product.stock_quantity = max(0, product.stock_quantity - order.quantity)
+    
+    # Calculate and add savings points
+    savings_account = get_or_create_savings_account(customer.id)
+    order_total = product.price * order.quantity
+    points_earned = int(round(order_total * SAVINGS_POINT_RATE))
+    savings_account.current_points += points_earned
+    savings_account.lifetime_points += points_earned
+    
+    # Check if customer is eligible for reward
+    if savings_account.current_points >= REWARD_THRESHOLD and savings_account.reward_status == 'NORMAL' and not savings_account.eligibility_email_sent:
+        savings_account.reward_status = 'ELIGIBLE'
+        savings_account.eligible_since = datetime.utcnow()
+        savings_account.eligibility_email_sent = True
+        # Send email to all admins
+        admins = User.query.filter(User.user_role.in_(['admin', 'super_admin'])).all()
+        if admins:
+            try:
+                assigned_member = User.query.get(customer.assigned_member_id)
+                body = f"""
+Customer Eligible for Reward!
+
+Customer: {customer.full_name}
+Email: {customer.email}
+Phone: {customer.phone}
+Current Points: {savings_account.current_points}
+Assigned Sales Member: {assigned_member.full_name if assigned_member else 'N/A'}
+                """.strip()
+                send_email(
+                    to=[a.email for a in admins],
+                    subject='Customer Eligible for Reward - Abound Next-Gen E-Hub',
+                    html=f"<pre>{body}</pre>"
+                )
+            except Exception as e:
+                app.logger.error(f"Failed to send eligibility email: {e}")
+    
+    db.session.commit()
+    
+    # Send order notifications
+    send_order_notification(order)
+    # Check if customer email works for order confirmation
+    try:
+        send_order_confirmation_buyer(order)
+    except Exception as e:
+        app.logger.error(f"Failed to send order confirmation to customer: {e}")
+    
+    return jsonify({
+        'success': True,
+        'order_id': order.id
+    })
+
+@app.route('/customer-dashboard')
+def customer_dashboard():
+    """Customer dashboard (requires login)."""
+    if 'user_id' not in session:
+        flash('Please log in.', 'error')
+        return redirect(url_for('login'))
+    user = User.query.get(session['user_id'])
+    if not user:
+        session.clear()
+        return redirect(url_for('login'))
+    if user.user_role != 'customer':
+        # Redirect sales users and admins to their respective dashboards
+        if user.is_admin_role:
+            return redirect(url_for('admin_dashboard'))
+        else:
+            return redirect(url_for('dashboard'))
+    # Get savings account
+    savings_account = get_or_create_savings_account(user.id)
+    # Get orders
+    orders = Order.query.filter_by(user_id=user.id).order_by(Order.created_at.desc()).all()
+    # Get assigned member
+    assigned_member = User.query.get(user.assigned_member_id)
+    return render_template('customer_dashboard.html', user=user, savings_account=savings_account,
+        orders=orders, assigned_member=assigned_member)
+
+@app.route('/admin/customer-rewards')
+@require_admin
+def admin_customer_rewards():
+    """Admin page to manage customer rewards."""
+    # Get all customers with savings accounts
+    customers = User.query.filter_by(user_role='customer').all()
+    for customer in customers:
+        customer.savings_account = get_or_create_savings_account(customer.id)
+        customer.assigned_member = User.query.get(customer.assigned_member_id)
+    return render_template('admin/customer_rewards.html', customers=customers)
+
+@app.route('/admin/customer/<int:customer_id>/mark-gift-delivered', methods=['POST'])
+@require_admin
+def admin_mark_gift_delivered(customer_id):
+    """Mark a customer's gift as delivered, reset current points, create redemption record."""
+    admin_user = User.query.get(session['user_id'])
+    customer = User.query.get_or_404(customer_id)
+    if customer.user_role != 'customer':
+        flash('Only customers can have gift rewards.', 'error')
+        return redirect(url_for('admin_customer_rewards'))
+    savings_account = get_or_create_savings_account(customer.id)
+    if savings_account.reward_status != 'ELIGIBLE' and savings_account.reward_status != 'PENDING':
+        flash('Customer is not eligible for a gift.', 'error')
+        return redirect(url_for('admin_customer_rewards'))
+    # Get reward name/description from form
+    reward_name = request.form.get('reward_name', 'Gift')
+    remarks = request.form.get('remarks', '')
+    # Create redemption record
+    redemption = SavingsRedemption(
+        customer_id=customer.id,
+        points_redeemed=savings_account.current_points,
+        reward_name=reward_name,
+        admin_id=admin_user.id,
+        remarks=remarks
+    )
+    db.session.add(redemption)
+    # Reset current points
+    savings_account.current_points = 0
+    savings_account.reward_status = 'DELIVERED'
+    db.session.commit()
+    log_activity(admin_user.id, f'Marked gift delivered for customer {customer.full_name}', 'customer', customer.id)
+    flash('Gift marked as delivered!', 'success')
+    return redirect(url_for('admin_customer_rewards'))
 
 @app.route('/order/<int:product_id>', methods=['POST'])
 def create_order(product_id):
@@ -1897,7 +2230,8 @@ def migrate_db():
     db.create_all()
     # Add new columns if missing (SQLite)
     user_cols = [('user_level', 'INTEGER DEFAULT 1'), ('is_admin', 'INTEGER DEFAULT 0'), ('user_role', "VARCHAR(20) DEFAULT 'user'"),
-        ('phone', 'VARCHAR(20)'), ('address', 'VARCHAR(255)'), ('user_status', "VARCHAR(20) DEFAULT 'active'")]
+        ('phone', 'VARCHAR(20)'), ('address', 'VARCHAR(255)'), ('user_status', "VARCHAR(20) DEFAULT 'active'"),
+        ('assigned_member_id', 'INTEGER')]
     for col, def_sql in user_cols:
         try:
             with db.engine.connect() as conn:
@@ -1906,6 +2240,18 @@ def migrate_db():
             try:
                 with db.engine.begin() as conn:
                     conn.execute(text(f"ALTER TABLE user ADD COLUMN {col} {def_sql}"))
+            except Exception:
+                pass
+    # Add new columns to savings_account if missing
+    savings_account_cols = [('eligibility_email_sent', 'INTEGER DEFAULT 0')]
+    for col, def_sql in savings_account_cols:
+        try:
+            with db.engine.connect() as conn:
+                conn.execute(text(f"SELECT {col} FROM savings_account LIMIT 1"))
+        except Exception:
+            try:
+                with db.engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE savings_account ADD COLUMN {col} {def_sql}"))
             except Exception:
                 pass
     for col, def_sql in [('category_id', 'INTEGER'), ('stock_quantity', 'INTEGER'), ('sku', 'VARCHAR(50)'), ('weight', 'REAL'), ('dimensions', 'VARCHAR(100)')]:

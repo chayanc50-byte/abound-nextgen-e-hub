@@ -1,0 +1,149 @@
+{% extends "base_public.html" %}
+
+{% block title %}Retail Checkout - Abound Next-Gen E-Hub{% endblock %}
+
+{% block content %}
+<section class="section catalog-hero" style="padding: 2rem 0;">
+    <div class="container">
+        <h1 class="page-title">Retail Checkout</h1>
+        <p class="page-subtitle">Complete your purchase as a retail customer.</p>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container" style="max-width: 900px;">
+        <div class="checkout-page">
+            <form method="POST" id="retail-checkout-form" novalidate>
+                <input type="hidden" name="product_id" value="{{ product.id }}">
+                <input type="hidden" name="quantity" value="{{ quantity }}">
+
+                <div class="checkout-grid">
+                    <div class="checkout-main">
+                        <div class="checkout-card checkout-section">
+                            <h3>Product Summary</h3>
+                            <div class="checkout-summary">
+                                <div class="summary-image">
+                                    {% if product.image_url %}
+                                        <img src="{{ product.image_url }}" alt="{{ product.name }}">
+                                    {% else %}
+                                        <div class="summary-placeholder">📦</div>
+                                    {% endif %}
+                                </div>
+                                <div class="summary-details">
+                                    <h4>{{ product.name }}</h4>
+                                    <p class="summary-price">₹{{ "%.2f"|format(product.price) }}</p>
+                                    <p class="summary-qty">Quantity: {{ quantity }}</p>
+                                    <p class="summary-subtotal"><strong>Subtotal: ₹{{ "%.2f"|format(product.price * quantity) }}</strong></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="checkout-card checkout-section">
+                            <h3>Select Sales Member</h3>
+                            <div class="form-group">
+                                <select id="assigned_member_id" name="assigned_member_id" class="input-select" required>
+                                    <option value="">-- Select a Sales Member --</option>
+                                    {% for member in sales_members %}
+                                    <option value="{{ member.id }}">{{ member.full_name }} ({{ member.referral_id or 'No Referral ID' }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="checkout-card checkout-section">
+                            <h3>Your Details</h3>
+                            <div class="form-group">
+                                <label for="full_name">Full Name <span class="required">*</span></label>
+                                <input type="text" id="full_name" name="full_name" placeholder="Your full name" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="email">Email <span class="required">*</span></label>
+                                <input type="email" id="email" name="email" placeholder="your@email.com" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="phone">Phone Number <span class="required">*</span></label>
+                                <input type="tel" id="phone" name="phone" placeholder="10-digit mobile number" required>
+                            </div>
+                        </div>
+
+                        <div class="checkout-card checkout-section">
+                            <h3>Delivery Address</h3>
+                            <div class="form-group form-group-full">
+                                <label for="shipping_address">Complete Shipping Address <span class="required">*</span></label>
+                                <textarea id="shipping_address" name="shipping_address" rows="4" placeholder="House No, Street, Area, Landmark, City, State, PIN Code, Country" required></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="checkout-sidebar">
+                        <div class="checkout-card checkout-order-card">
+                            <h3>Order Total</h3>
+                            <p class="order-total">₹{{ "%.2f"|format(product.price * quantity) }}</p>
+                            <p id="retail-razorpay-error" class="razorpay-error" style="display:none;"></p>
+                            <button type="submit" class="btn-place-order" id="retail-place-order-btn">
+                                <span class="btn-text">{% if razorpay_key_id %}Pay Now{% else %}Place Order{% endif %}</span>
+                                <span class="btn-loading" style="display:none;"><span class="spinner"></span> Processing...</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</section>
+
+<script>
+window.RETAIL_CHECKOUT_CONFIG = {
+    razorpayKeyId: {{ razorpay_key_id|tojson }},
+    businessName: 'Abound NextGen E Hub',
+    productName: {{ product.name|tojson }},
+    productId: {{ product.id }},
+    quantity: {{ quantity }},
+    razorpayEnabled: {{ (razorpay_key_id != '')|tojson }}
+};
+</script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="{{ url_for('static', filename='js/razorpay-checkout.js') }}?v=2"></script>
+
+<script>
+(function() {
+    var form = document.getElementById('retail-checkout-form');
+    var placeOrderBtn = document.getElementById('retail-place-order-btn');
+    var errorEl = document.getElementById('retail-razorpay-error');
+
+    function isValidPhone(val) { return /^[0-9]{10}$/.test((val || '').trim()); }
+
+    function validateForm() {
+        var fullName = document.getElementById('full_name').value.trim();
+        var email = document.getElementById('email').value.trim();
+        var phone = document.getElementById('phone').value.trim();
+        var shippingAddress = document.getElementById('shipping_address').value.trim();
+        var assignedMemberId = document.getElementById('assigned_member_id').value;
+
+        return fullName.length > 0 &&
+               email.length > 0 &&
+               isValidPhone(phone) &&
+               shippingAddress.length > 0 &&
+               assignedMemberId.length > 0;
+    }
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        errorEl.style.display = 'none';
+
+        if (!validateForm()) {
+            alert('Please fill all required fields.');
+            return;
+        }
+
+        if (window.RETAIL_CHECKOUT_CONFIG && window.RETAIL_CHECKOUT_CONFIG.razorpayEnabled) {
+            if (typeof window.startRetailRazorpayCheckout === 'function') {
+                window.startRetailRazorpayCheckout(form);
+            }
+        } else {
+            alert('Razorpay not configured. Please contact support.');
+        }
+    });
+})();
+</script>
+{% endblock %}

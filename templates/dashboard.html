@@ -66,6 +66,32 @@
     </div>
 
     <div class="quick-actions">
+        <h2>My Customers</h2>
+        {% if my_customers %}
+        <div class="table-responsive">
+        <table class="admin-table" style="margin-bottom: 1.5rem;">
+            <thead><tr><th>Customer Name</th><th>Phone</th><th>Email</th><th>Current Points</th><th>Lifetime Points</th><th>Last Purchase</th><th>Total Purchases</th></tr></thead>
+            <tbody>
+            {% for customer in my_customers %}
+            <tr>
+                <td>{{ customer.full_name }}</td>
+                <td>{{ customer.phone or '—' }}</td>
+                <td>{{ customer.email }}</td>
+                <td>{{ customer.savings_account.current_points or 0 if customer.savings_account else 0 }}</td>
+                <td>{{ customer.savings_account.lifetime_points or 0 if customer.savings_account else 0 }}</td>
+                <td>{{ customer.last_purchase.strftime('%Y-%m-%d') if customer.last_purchase else '—' }}</td>
+                <td>{{ customer.total_purchases or 0 }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p class="muted">No customers yet.</p>
+        {% endif %}
+    </div>
+
+    <div class="quick-actions">
         <h2>My Orders</h2>
         {% if orders %}
         <div class="table-responsive">

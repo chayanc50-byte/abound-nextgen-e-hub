@@ -1,10 +1,10 @@
 /**
- * Razorpay Standard Checkout for checkout.html
- * Expects window.CHECKOUT_CONFIG from the template.
+ * Razorpay Standard Checkout for checkout.html and retail_checkout.html
+ * Expects window.CHECKOUT_CONFIG or window.RETAIL_CHECKOUT_CONFIG from the template.
  */
 (function () {
-    function showError(msg) {
-        var el = document.getElementById('razorpay-error');
+    function showError(msg, elementId) {
+        var el = document.getElementById(elementId || 'razorpay-error');
         if (el) {
             el.textContent = msg;
             el.style.display = 'block';
@@ -13,16 +13,16 @@
         }
     }
 
-    function clearError() {
-        var el = document.getElementById('razorpay-error');
+    function clearError(elementId) {
+        var el = document.getElementById(elementId || 'razorpay-error');
         if (el) {
             el.textContent = '';
             el.style.display = 'none';
         }
     }
 
-    function setPayButtonLoading(loading) {
-        var btn = document.getElementById('place-order-btn');
+    function setPayButtonLoading(loading, buttonId) {
+        var btn = document.getElementById(buttonId || 'place-order-btn');
         if (!btn) return;
         var text = btn.querySelector('.btn-text');
         var loadingEl = btn.querySelector('.btn-loading');
@@ -88,7 +88,7 @@
                     var msg = (res.data && res.data.error) || 'Could not create payment order.';
                     throw new Error(msg);
                 }
-                openRazorpayModal(res.data, res.pending);
+                openRazorpayModal(res.data, res.pending, cfg);
             })
             .catch(function (err) {
                 showError(err.message || 'Payment could not be started.');
@@ -99,8 +99,66 @@
             });
     };
 
-    function openRazorpayModal(rzpOrder, pending) {
-        var cfg = window.CHECKOUT_CONFIG || {};
+    window.startRetailRazorpayCheckout = function (form) {
+        clearError('retail-razorpay-error');
+        var cfg = window.RETAIL_CHECKOUT_CONFIG || {};
+        if (!cfg.razorpayKeyId) {
+            showError('Payment is not configured. Please contact support.', 'retail-razorpay-error');
+            return;
+        }
+        if (typeof Razorpay === 'undefined') {
+            showError('Payment script failed to load. Please refresh and try again.', 'retail-razorpay-error');
+            return;
+        }
+
+        setPayButtonLoading(true, 'retail-place-order-btn');
+        var formData = new FormData(form);
+
+        fetch('/api/retail-checkout/prepare-pending', {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        })
+            .then(function (r) {
+                return r.json().then(function (data) {
+                    return { ok: r.ok, status: r.status, data: data };
+                });
+            })
+            .then(function (res) {
+                if (!res.ok) {
+                    throw new Error((res.data && res.data.error) || 'Could not prepare order.');
+                }
+                return res.data;
+            })
+            .then(function (pending) {
+                return fetch('/api/create-order', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        amount: pending.amount_paise,
+                        currency: 'INR',
+                        receipt: pending.receipt,
+                    }),
+                }).then(function (r) {
+                    return r.json().then(function (data) {
+                        return { ok: r.ok, status: r.status, data: data, pending: pending };
+                    });
+                });
+            })
+            .then(function (res) {
+                if (!res.ok) {
+                    var msg = (res.data && res.data.error) || 'Could not create payment order.';
+                    throw new Error(msg);
+                }
+                openRetailRazorpayModal(res.data, res.pending, cfg);
+            })
+            .catch(function (err) {
+                showError(err.message || 'Payment could not be started.', 'retail-razorpay-error');
+                setPayButtonLoading(false, 'retail-place-order-btn');
+            });
+    };
+
+    function openRazorpayModal(rzpOrder, pending, cfg) {
         var options = {
             key: cfg.razorpayKeyId,
             amount: rzpOrder.amount,
@@ -144,6 +202,48 @@
         setPayButtonLoading(false);
     }
 
+    function openRetailRazorpayModal(rzpOrder, pending, cfg) {
+        var fullName = document.getElementById('full_name').value.trim();
+        var email = document.getElementById('email').value.trim();
+        var phone = document.getElementById('phone').value.trim();
+
+        var options = {
+            key: cfg.razorpayKeyId,
+            amount: rzpOrder.amount,
+            currency: rzpOrder.currency,
+            name: cfg.businessName || 'Abound NextGen E Hub',
+            description: pending.product_name || 'Retail order payment',
+            order_id: rzpOrder.order_id,
+            prefill: {
+                name: fullName,
+                email: email,
+                contact: phone,
+            },
+            theme: { color: '#ff7a00' },
+            handler: function (response) {
+                verifyRetailPayment(response);
+            },
+            modal: {
+                ondismiss: function () {
+                    showError('Payment cancelled.', 'retail-razorpay-error');
+                    setPayButtonLoading(false, 'retail-place-order-btn');
+                },
+            },
+        };
+
+        var rzp = new Razorpay(options);
+        rzp.on('payment.failed', function (response) {
+            var reason =
+                (response.error && response.error.description) ||
+                (response.error && response.error.reason) ||
+                'Payment failed. Please try again.';
+            showError(reason, 'retail-razorpay-error');
+            setPayButtonLoading(false, 'retail-place-order-btn');
+        });
+        rzp.open();
+        setPayButtonLoading(false, 'retail-place-order-btn');
+    }
+
     function verifyPayment(response, appOrderId) {
         setPayButtonLoading(true);
         clearError();
@@ -175,6 +275,36 @@
                 if (typeof window.updateCheckoutFormState === 'function') {
                     window.updateCheckoutFormState();
                 }
+            });
+    }
+
+    function verifyRetailPayment(response) {
+        setPayButtonLoading(true, 'retail-place-order-btn');
+        clearError('retail-razorpay-error');
+        fetch('/api/retail-checkout/verify-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+            }),
+        })
+            .then(function (r) {
+                return r.json().then(function (data) {
+                    return { ok: r.ok, data: data };
+                });
+            })
+            .then(function (res) {
+                if (!res.ok || !res.data.success) {
+                    throw new Error((res.data && res.data.error) || 'Payment verification failed.');
+                }
+                window.location.href =
+                    '/order-success?order_id=' + encodeURIComponent(res.data.order_id);
+            })
+            .catch(function (err) {
+                showError(err.message || 'Payment verification failed.', 'retail-razorpay-error');
+                setPayButtonLoading(false, 'retail-place-order-btn');
             });
     }
 })();

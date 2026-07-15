@@ -1,15 +1,17 @@
-{% extends "admin/base.html" %}
+{% extends "base.html" %}
 
 {% block title %}Customer Rewards - Admin{% endblock %}
-{% block page_title %}Customer Rewards{% endblock %}
+{% block topbar_title %}Customer Rewards{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('admin_dashboard') }}">Dashboard</a> > Customer Rewards{% endblock %}
 
 {% block content %}
-<div class="admin-content">
-    <div class="admin-section">
+<div class="admin-page">
+    <h1>Customer Rewards</h1>
+    <div class="admin-section-card">
         <h2 class="section-title">All Customers</h2>
         {% if customers %}
         <div class="table-responsive">
-            <table class="admin-table">
+            <table class="admin-table" style="margin-top: 0.5rem;">
                 <thead>
                     <tr>
                         <th>Customer</th>

@@ -28,8 +28,9 @@
             <textarea name="description" rows="3">{{ product.description if product else '' }}</textarea>
         </div>
         <div class="form-group">
-            <label>Stock Quantity (leave empty for unlimited)</label>
+            <label>Stock Quantity</label>
             <input type="number" name="stock_quantity" min="0" value="{{ product.stock_quantity if product and product.stock_quantity is not none else '' }}" placeholder="Unlimited">
+            <small class="muted">Leave blank = Unlimited. Enter 0 for Out of Stock.</small>
         </div>
         <div class="form-group">
             <label>SKU</label>

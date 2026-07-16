@@ -113,6 +113,19 @@ def generate_referral_id():
             return ref_id
     raise ValueError('Could not generate unique referral ID')
 
+def generate_product_sku():
+    """Generate a unique product SKU when the admin leaves it blank."""
+    for _ in range(100):
+        sku = f"SKU-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{random.randint(1000,9999)}"
+        if not Product.query.filter_by(sku=sku).first():
+            return sku
+    return f"SKU-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{random.randint(10000,99999)}"
+
+def decrement_tracked_stock(product, quantity):
+    """Reduce inventory only for tracked-stock products."""
+    if product.stock_quantity is not None and product.stock_quantity > 0:
+        product.stock_quantity = max(0, product.stock_quantity - quantity)
+
 def send_welcome_email(user):
     """Send welcome email to new registrants."""
 
@@ -495,7 +508,7 @@ class Product(db.Model):
     price = db.Column(db.Float, nullable=False)
     image_url = db.Column(db.String(255))
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True)
-    stock_quantity = db.Column(db.Integer, default=0)  # 0 = unlimited or use null
+    stock_quantity = db.Column(db.Integer, nullable=True)  # None = unlimited, 0 = out of stock
     sku = db.Column(db.String(50), nullable=True)
     weight = db.Column(db.Float, nullable=True)
     dimensions = db.Column(db.String(100), nullable=True)
@@ -503,7 +516,7 @@ class Product(db.Model):
 
     @property
     def is_out_of_stock(self):
-        return self.stock_quantity is not None and self.stock_quantity <= 0
+        return self.stock_quantity == 0
 
 class Address(db.Model):
     """Saved delivery address for a user."""
@@ -1278,8 +1291,7 @@ def api_verify_payment():
         return jsonify({'error': 'Product is out of stock', 'success': False}), 400
     order.payment_status = 'Paid'
     order.razorpay_order_id = rzp_order_id
-    if product.stock_quantity is not None:
-        product.stock_quantity = max(0, (product.stock_quantity or 0) - order.quantity)
+    decrement_tracked_stock(product, order.quantity)
     db.session.commit()
     distribute_commission(order)
     send_order_notification(order)
@@ -1375,8 +1387,7 @@ def place_order(product_id):
         payment_status='Paid'
     )
     db.session.add(order)
-    if product.stock_quantity is not None:
-        product.stock_quantity = max(0, (product.stock_quantity or 0) - quantity)
+    decrement_tracked_stock(product, quantity)
     db.session.commit()
 
     # Save address if checkbox selected and using manual address (not saved address)
@@ -1607,8 +1618,7 @@ def retail_checkout_verify_payment():
     db.session.add(order)
     
     # Update stock
-    if product.stock_quantity is not None:
-        product.stock_quantity = max(0, product.stock_quantity - order.quantity)
+    decrement_tracked_stock(product, order.quantity)
     
     # Calculate and add savings points
     savings_account = get_or_create_savings_account(customer.id)
@@ -1752,8 +1762,7 @@ def create_order(product_id):
     order = Order(user_id=user.id, product_id=product.id, amount=product.price, quantity=quantity,
         shipping_address=shipping_address or None, phone=phone or None, payment_status='Paid')
     db.session.add(order)
-    if product.stock_quantity is not None:
-        product.stock_quantity = max(0, (product.stock_quantity or 0) - quantity)
+    decrement_tracked_stock(product, quantity)
     db.session.commit()
     distribute_commission(order)
     send_order_notification(order)
@@ -2798,7 +2807,7 @@ def admin_product_add():
         category_id = request.form.get('category_id', type=int)
         description = request.form.get('description', '')
         stock_quantity = request.form.get('stock_quantity', type=int)
-        sku = request.form.get('sku', '')
+        sku = request.form.get('sku', '').strip()
         weight = request.form.get('weight', type=float)
         dimensions = request.form.get('dimensions', '')
         if not name or price is None:
@@ -2818,7 +2827,7 @@ def admin_product_add():
                     img_path = f'/static/images/{fn}'
         p = Product(name=name, price=price, description=description or None, image_url=img_path,
             category_id=category_id if category_id else None, stock_quantity=stock_quantity if stock_quantity is not None else None,
-            sku=sku or None, weight=weight if weight else None, dimensions=dimensions or None)
+            sku=sku or generate_product_sku(), weight=weight if weight else None, dimensions=dimensions or None)
         db.session.add(p)
         db.session.commit()
         log_activity(session['user_id'], f'Created product: {name}', 'product', p.id)
@@ -2839,7 +2848,7 @@ def admin_product_edit(prod_id):
         p.category_id = request.form.get('category_id', type=int) or None
         p.description = request.form.get('description', '') or None
         p.stock_quantity = request.form.get('stock_quantity', type=int) if request.form.get('stock_quantity') != '' else None
-        p.sku = request.form.get('sku', '') or None
+        p.sku = request.form.get('sku', '').strip() or generate_product_sku()
         p.weight = request.form.get('weight', type=float) or None
         p.dimensions = request.form.get('dimensions', '') or None
         if 'image' in request.files and request.files['image'].filename:

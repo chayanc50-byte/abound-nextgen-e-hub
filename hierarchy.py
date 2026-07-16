@@ -2,13 +2,13 @@
 
 # Level order and names (1-10)
 LEVELS = [
-    (1, "Sales Executive"),
+    (1, "General Franchise"),
     (2, "Sub Franchise"),
     (3, "Franchise"),
     (4, "Super Franchise"),
-    (5, "CNF"),
-    (6, "Business Development Manager"),
-    (7, "Senior Manager"),
+    (5, "Merchant"),
+    (6, "Super Merchant"),
+    (7, "Core Merchant Team"),
     (8, "Business Development Director"),
     (9, "Senior Director"),
     (10, "Chief Business Development Director"),

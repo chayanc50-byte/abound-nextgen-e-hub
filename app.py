@@ -47,6 +47,7 @@ app.config['RAZORPAY_KEY_SECRET'] = os.environ.get('RAZORPAY_KEY_SECRET', '').st
 # Configurable constants for retail customer system
 SAVINGS_POINT_RATE = 0.10  # 0.1 points per rupee (10 points per ₹100)
 REWARD_THRESHOLD = 5000  # Points needed to be eligible for a reward
+MEMBERSHIP_ACTIVATION_AMOUNT = 4999
 
 db = SQLAlchemy(app)
 
@@ -409,6 +410,8 @@ class User(db.Model):
     position = db.Column(db.String(80), nullable=True)
     # For retail customers: assigned sales member
     assigned_member_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    membership_status = db.Column(db.String(20), default='active')
+    activated_at = db.Column(db.DateTime, nullable=True)
     
     children = db.relationship('User', backref=db.backref('parent', remote_side=[id]), lazy='dynamic', foreign_keys='User.parent_id')
     
@@ -417,19 +420,25 @@ class User(db.Model):
     
     def get_sales_children(self):
         """Children that are sales users (user_role=user) only."""
-        return [c for c in self.children if getattr(c, 'user_role', None) == 'user']
+        if not self.is_sales_user or not self.is_membership_active:
+            return []
+        return [c for c in self.children if getattr(c, 'user_role', None) == 'user' and c.is_membership_active]
     
     def get_team_count(self):
-        return sum(1 for c in self.children if getattr(c, 'user_role', None) == 'user')
+        return len(self.get_direct_referrals())
     
     def get_direct_referrals(self):
-        return [c for c in self.children.all() if getattr(c, 'user_role', None) == 'user']
+        if not self.is_sales_user or not self.is_membership_active:
+            return []
+        return [c for c in self.children.all() if getattr(c, 'user_role', None) == 'user' and c.is_membership_active]
     
     def get_all_descendants(self):
         """Only sales users (user_role=user) in the pyramid."""
+        if not self.is_sales_user or not self.is_membership_active:
+            return []
         descendants = []
         for child in self.children:
-            if getattr(child, 'user_role', None) == 'user':
+            if getattr(child, 'user_role', None) == 'user' and child.is_membership_active:
                 descendants.append(child)
                 descendants.extend(child.get_all_descendants())
         return descendants
@@ -448,22 +457,30 @@ class User(db.Model):
     
     def get_upline_chain(self, max_levels=10):
         """Trace referral chain upward - only sales users, stop at admin/super_admin."""
+        if not self.is_sales_user or not self.is_membership_active:
+            return []
         chain = []
         current = self.parent
         while current and len(chain) < max_levels:
             if getattr(current, 'user_role', None) in ('admin', 'super_admin'):
                 break  # Stop chain, do not include admin in commission
+            if getattr(current, 'user_role', None) == 'user' and not current.is_membership_active:
+                break
             chain.append(current)
             current = current.parent
         return chain
 
     def get_commission_upline_chain(self, max_levels=10):
         """Upline chain for commission: sponsor first, then sponsor's upline. Skip inactive, stop at admin."""
+        if not self.is_sales_user or not self.is_membership_active:
+            return []
         chain = []
         current = self.parent
         while current and len(chain) < max_levels:
             if getattr(current, 'user_role', None) in ('admin', 'super_admin'):
                 break  # Admin/Super Admin never receive commission
+            if getattr(current, 'user_role', None) == 'user' and not current.is_membership_active:
+                break
             if not getattr(current, 'is_user_active', True):
                 current = current.parent  # Skip inactive, continue upward
                 continue
@@ -484,6 +501,16 @@ class User(db.Model):
     @property
     def is_sales_user(self):
         return getattr(self, 'user_role', None) == 'user'
+
+    @property
+    def is_membership_active(self):
+        if not self.is_sales_user:
+            return True
+        return (getattr(self, 'membership_status', None) or 'active') == 'active'
+
+    @property
+    def is_membership_pending(self):
+        return self.is_sales_user and not self.is_membership_active
 
     @property
     def is_user_active(self):
@@ -626,6 +653,10 @@ class Commission(db.Model):
     user = db.relationship('User', backref='commissions')
     order = db.relationship('Order', backref='commissions')
 
+    @property
+    def current_level_name(self):
+        return next((n for l, n in hierarchy_config.LEVELS if l == self.commission_level), self.commission_level_name or self.commission_level)
+
 def log_activity(admin_id, action, target_type=None, target_id=None, details=None):
     """Record admin activity for audit trail."""
     db.session.add(ActivityLog(admin_id=admin_id, action=action, target_type=target_type, target_id=target_id, details=details))
@@ -678,14 +709,14 @@ class SavingsRedemption(db.Model):
 
 def count_direct_at_level(user, level):
     """Count direct sales-user children who have the given level."""
-    if level is None:
+    if level is None or not user.is_membership_active:
         return 0
-    return sum(1 for c in user.children if getattr(c, 'user_role', None) == 'user' and c.user_level == level)
+    return sum(1 for c in user.children if getattr(c, 'user_role', None) == 'user' and c.user_level == level and c.is_membership_active)
 
 def check_and_promote_user(user_id):
     """Promote if sales user has 10 direct referrals at their current level. Skip admin/super_admin."""
     user = User.query.get(user_id)
-    if not user or not user.is_sales_user or not user.user_level or user.user_level >= 10:
+    if not user or not user.is_sales_user or not user.is_membership_active or not user.user_level or user.user_level >= 10:
         return False
     direct_same_level = count_direct_at_level(user, user.user_level)
     if direct_same_level >= hierarchy_config.PROMOTION_DIRECT_COUNT:
@@ -711,6 +742,25 @@ def get_or_create_savings_account(customer_id):
         sa = SavingsAccount(customer_id=customer_id)
         db.session.add(sa)
     return sa
+
+def get_paid_purchase_total(user_id):
+    total = db.session.query(func.sum(Order.amount * func.coalesce(Order.quantity, 1))).filter(
+        Order.user_id == user_id,
+        Order.payment_status == 'Paid'
+    ).scalar()
+    return float(total or 0)
+
+def refresh_membership_activation(user_id):
+    user = User.query.get(user_id)
+    if not user or not user.is_sales_user or user.is_membership_active:
+        return False
+    if get_paid_purchase_total(user.id) < MEMBERSHIP_ACTIVATION_AMOUNT:
+        return False
+    user.membership_status = 'active'
+    if not user.activated_at:
+        user.activated_at = datetime.utcnow()
+    db.session.commit()
+    return True
 
 def distribute_commission(order):
     """Sponsor-based commission: buyer gets 0. Level 1=sponsor, Level 2=sponsor's upline, etc.
@@ -1002,6 +1052,7 @@ def dashboard():
     
     team_count = len(user.get_all_descendants())
     direct_count = user.get_team_count()
+    paid_purchase_total = get_paid_purchase_total(user.id)
     wallet = get_or_create_wallet(user.id)
     orders = Order.query.filter_by(user_id=user.id).order_by(Order.created_at.desc()).limit(20).all()
     has_push_token = DeviceToken.query.filter_by(user_id=user.id).count() > 0
@@ -1017,7 +1068,8 @@ def dashboard():
     return render_template('dashboard.html', user=user, team_count=team_count,
         direct_count=direct_count, wallet=wallet, orders=orders, has_push_token=has_push_token,
         levels=hierarchy_config.LEVELS, commission_by_level=hierarchy_config.COMMISSION_BY_LEVEL,
-        my_customers=my_customers)
+        my_customers=my_customers, paid_purchase_total=paid_purchase_total,
+        membership_activation_amount=MEMBERSHIP_ACTIVATION_AMOUNT)
 
 @app.route('/products')
 def products():
@@ -1293,6 +1345,7 @@ def api_verify_payment():
     order.razorpay_order_id = rzp_order_id
     decrement_tracked_stock(product, order.quantity)
     db.session.commit()
+    refresh_membership_activation(order.user_id)
     distribute_commission(order)
     send_order_notification(order)
     send_order_confirmation_buyer(order)
@@ -1389,6 +1442,7 @@ def place_order(product_id):
     db.session.add(order)
     decrement_tracked_stock(product, quantity)
     db.session.commit()
+    refresh_membership_activation(order.user_id)
 
     # Save address if checkbox selected and using manual address (not saved address)
     address_saved = False
@@ -1782,6 +1836,7 @@ def create_order(product_id):
     db.session.add(order)
     decrement_tracked_stock(product, quantity)
     db.session.commit()
+    refresh_membership_activation(order.user_id)
     distribute_commission(order)
     send_order_notification(order)
     send_order_confirmation_buyer(order)
@@ -2038,20 +2093,26 @@ def my_team():
 
     # Upline: sponsor and above (sales users only)
     upline = []
-    current = user.parent
-    while current:
-        if getattr(current, 'user_role', None) == 'user':
-            upline.append(current)
-        current = current.parent
+    if user.is_membership_active:
+        current = user.parent
+        while current:
+            if getattr(current, 'user_role', None) in ('admin', 'super_admin'):
+                break
+            if getattr(current, 'user_role', None) == 'user' and not current.is_membership_active:
+                break
+            if getattr(current, 'user_role', None) == 'user':
+                upline.append(current)
+            current = current.parent
 
     # Peers: others with same sponsor (siblings)
     peers = []
-    if user.parent_id:
+    if user.is_membership_active and user.parent_id:
         peers = User.query.filter(
             User.parent_id == user.parent_id,
             User.id != user.id,
             User.user_role == 'user'
         ).order_by(User.created_at).all()
+        peers = [peer for peer in peers if peer.is_membership_active]
 
     # Downline: direct referrals
     downline = user.get_direct_referrals()
@@ -2059,7 +2120,9 @@ def my_team():
     direct_count = user.get_team_count()
 
     return render_template('my_team.html', user=user, upline=upline, peers=peers,
-        team_members=downline, team_count=team_count, direct_count=direct_count)
+        team_members=downline, team_count=team_count, direct_count=direct_count,
+        paid_purchase_total=get_paid_purchase_total(user.id),
+        membership_activation_amount=MEMBERSHIP_ACTIVATION_AMOUNT)
 
 @app.route('/onboard', methods=['POST'])
 def onboard():
@@ -2098,7 +2161,8 @@ def onboard():
         parent_id=parent_user.id,
         user_level=1,
         user_role='user',
-        referral_id=ref_id
+        referral_id=ref_id,
+        membership_status='pending_activation'
     )
     
     db.session.add(new_user)
@@ -2141,6 +2205,18 @@ def team_stats():
     user = User.query.get(session['user_id'])
     if not user or not user.is_sales_user:
         return jsonify({'error': 'Sales users only'}), 403
+    if not user.is_membership_active:
+        paid_total = get_paid_purchase_total(user.id)
+        return jsonify({
+            'team_count': 0,
+            'direct_count': 0,
+            'direct_at_level': 0,
+            'current_level': user.level_name,
+            'next_level': None,
+            'membership_pending': True,
+            'paid_purchase_total': paid_total,
+            'activation_amount': MEMBERSHIP_ACTIVATION_AMOUNT,
+        })
     
     direct_count = count_direct_at_level(user, user.user_level)
     next_level = None
@@ -2187,15 +2263,12 @@ def register():
         
         new_ref_id = generate_referral_id()
         new_user = User(username=username, email=email, password_hash=generate_password_hash(password),
-            full_name=full_name, parent_id=parent.id, user_level=1, user_role='user', referral_id=new_ref_id)
+            full_name=full_name, parent_id=parent.id, user_level=1, user_role='user', referral_id=new_ref_id,
+            membership_status='pending_activation')
         db.session.add(new_user)
         db.session.commit()
         get_or_create_wallet(new_user.id)
         email_sent = send_welcome_email(new_user)
-        current = parent
-        while current:
-            check_and_promote_user(current.id)
-            current = current.parent
         
         if email_sent:
             flash('Registration successful! Check your email for your account details and Referral ID. Please login.', 'success')
@@ -2306,7 +2379,8 @@ def migrate_db():
     # Add new columns if missing (SQLite)
     user_cols = [('user_level', 'INTEGER DEFAULT 1'), ('is_admin', 'INTEGER DEFAULT 0'), ('user_role', "VARCHAR(20) DEFAULT 'user'"),
         ('phone', 'VARCHAR(20)'), ('address', 'VARCHAR(255)'), ('user_status', "VARCHAR(20) DEFAULT 'active'"),
-        ('assigned_member_id', 'INTEGER')]
+        ('assigned_member_id', 'INTEGER'), ('membership_status', "VARCHAR(20) DEFAULT 'active'"),
+        ('activated_at', 'DATETIME')]
     for col, def_sql in user_cols:
         try:
             with db.engine.connect() as conn:
@@ -2412,11 +2486,16 @@ def migrate_db():
             user.user_level = 0
             user.referral_id = None
             user.parent_id = None
+            user.membership_status = 'active'
         else:
             if getattr(user, 'user_level', None) in (None, 0):
                 user.user_level = level_map.get(user.position, 1) if user.position else 1
             if user.referral_id is None:
                 user.referral_id = generate_referral_id()
+            if getattr(user, 'membership_status', None) in (None, ''):
+                user.membership_status = 'active'
+            if user.is_sales_user and user.membership_status == 'active' and not getattr(user, 'activated_at', None):
+                user.activated_at = user.created_at
         if user.parent_id:
             parent = User.query.get(user.parent_id)
             if parent and getattr(parent, 'user_role', None) in ('admin', 'super_admin'):
@@ -2500,7 +2579,8 @@ def create_first_sales_user():
             parent_id=None,
             user_level=1,
             user_role='user',
-            referral_id=ref_id
+            referral_id=ref_id,
+            membership_status='pending_activation'
         )
         db.session.add(new_user)
         db.session.commit()
@@ -2513,7 +2593,7 @@ def create_first_sales_user():
 
 @app.route('/admin/users')
 @app.route('/admin-users')
-@require_super_admin
+@require_admin
 def admin_users():
     q = User.query
     search = request.args.get('search', '').strip()
@@ -2523,37 +2603,44 @@ def admin_users():
     return render_template('admin/users.html', users=users, search=search)
 
 @app.route('/admin/user/<int:user_id>', methods=['GET', 'POST'])
-@require_super_admin
+@require_admin
 def admin_user(user_id):
     admin_user = User.query.get(session['user_id'])
     user = User.query.get_or_404(user_id)
+    if not admin_user.is_super_admin and not user.is_sales_user:
+        flash('Admins can only manage sales users.', 'error')
+        return redirect(url_for('admin_users'))
     if request.method == 'POST':
         action = request.form.get('action')
         if action == 'reset_password':
-            pw = request.form.get('new_password')
-            if pw:
-                user.password_hash = generate_password_hash(pw)
-                db.session.commit()
-                log_activity(admin_user.id, f'Reset password for user: {user.full_name}', 'user', user.id)
-                flash('Password reset', 'success')
+            if not admin_user.is_super_admin:
+                flash('Only Super Admin can reset passwords.', 'error')
+            else:
+                pw = request.form.get('new_password')
+                if pw:
+                    user.password_hash = generate_password_hash(pw)
+                    db.session.commit()
+                    log_activity(admin_user.id, f'Reset password for user: {user.full_name}', 'user', user.id)
+                    flash('Password reset', 'success')
         elif action == 'update':
             user.full_name = request.form.get('full_name', user.full_name)
             user.email = request.form.get('email', user.email)
             user.phone = request.form.get('phone') or None
             user.address = request.form.get('address') or None
-            user_status = request.form.get('user_status', 'active')
-            if user_status in ('active', 'inactive', 'suspended'):
-                user.user_status = user_status
-                user.is_active = (user_status == 'active')
             if user.is_sales_user:
                 lvl = request.form.get('user_level', type=int)
                 if lvl and 1 <= lvl <= 10:
                     user.user_level = lvl
-            ref = request.form.get('referral_id', '').strip().upper()
-            if ref and user.is_sales_user:
-                existing = User.query.filter_by(referral_id=ref).first()
-                if not existing or existing.id == user.id:
-                    user.referral_id = ref
+            if admin_user.is_super_admin:
+                user_status = request.form.get('user_status', 'active')
+                if user_status in ('active', 'inactive', 'suspended'):
+                    user.user_status = user_status
+                    user.is_active = (user_status == 'active')
+                ref = request.form.get('referral_id', '').strip().upper()
+                if ref and user.is_sales_user:
+                    existing = User.query.filter_by(referral_id=ref).first()
+                    if not existing or existing.id == user.id:
+                        user.referral_id = ref
             db.session.commit()
             log_activity(admin_user.id, f'Updated user: {user.full_name}', 'user', user.id)
             flash('User updated', 'success')
@@ -2563,7 +2650,7 @@ def admin_user(user_id):
 
 @app.route('/admin/user/create', methods=['GET', 'POST'])
 @app.route('/admin-create-user', methods=['GET', 'POST'])
-@require_super_admin
+@require_admin
 def admin_user_create():
     admin_user = User.query.get(session['user_id'])
     if request.method == 'POST':
@@ -2573,6 +2660,8 @@ def admin_user_create():
         phone = request.form.get('phone') or None
         address = request.form.get('address') or None
         role = request.form.get('role', 'user')  # user or admin
+        if not admin_user.is_super_admin:
+            role = 'user'
         pw_option = request.form.get('password_option')
         password = request.form.get('password') or None
         auto_pw = pw_option == 'auto'
@@ -2597,7 +2686,8 @@ def admin_user_create():
             level = request.form.get('user_level', 1, type=int)
             u = User(username=username, email=email, password_hash=generate_password_hash(password),
                 full_name=full_name, phone=phone, address=address, user_level=max(1, min(10, level)),
-                referral_id=ref_id, parent_id=parent_id if parent_id else None, user_role='user')
+                referral_id=ref_id, parent_id=parent_id if parent_id else None, user_role='user',
+                membership_status='pending_activation')
         db.session.add(u)
         db.session.commit()
         if u.user_role == 'user':
@@ -3142,6 +3232,8 @@ def admin_reassign_user():
         return jsonify({'status': 'error', 'message': 'User not found.'}), 404
     if not new_parent:
         return jsonify({'status': 'error', 'message': 'New sponsor not found.'}), 404
+    if getattr(user, 'user_role', None) != 'user':
+        return jsonify({'status': 'error', 'message': 'Only sales users can be reassigned.'}), 400
 
     # Rule 3: Cannot reassign root user (parent_id is NULL)
     if user.parent_id is None:
@@ -3336,8 +3428,10 @@ def api_team_tree():
         return jsonify({'error': 'Sales users only'}), 403
     
     def build_tree(u):
-        sales_children = [c for c in u.children.limit(100) if getattr(c, 'user_role', None) == 'user']
+        sales_children = [c for c in u.children.limit(100) if getattr(c, 'user_role', None) == 'user' and c.is_membership_active]
         return {'id': u.id, 'name': u.full_name, 'level': u.level_name, 'ref_id': u.referral_id or '', 'children': [build_tree(c) for c in sales_children]}
+    if not user.is_membership_active:
+        return jsonify({'id': user.id, 'name': user.full_name, 'level': user.level_name, 'ref_id': user.referral_id or '', 'children': []})
     return jsonify(build_tree(user))
 
 # Initialize database when the application is imported

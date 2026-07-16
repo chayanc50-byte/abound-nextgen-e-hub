@@ -1,10 +1,17 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}Dashboard - Abound-E-Hub{% endblock %}
 {% block topbar_title %}Dashboard{% endblock %}
 {% block breadcrumb %}Dashboard{% endblock %}
 {% block content %}
 <div class="dashboard">
     <h1>Welcome, {{ user.full_name }}!</h1>
+    {% if user.is_membership_pending %}
+    <div class="membership-pending-banner">
+        <span class="badge badge-status-pending-activation">Pending Activation</span>
+        <p>Please complete purchases of ₹4,999 to activate your membership and become part of your upline and downline.</p>
+        <p class="muted">Paid purchases: ₹{{ "%.2f"|format(paid_purchase_total or 0) }} / ₹{{ "%.2f"|format(membership_activation_amount) }}</p>
+    </div>
+    {% endif %}
     
     <div class="my-network">
         <h2>My Network</h2>
@@ -200,6 +207,12 @@
     fetch('/api/team-stats').then(r => r.json()).then(data => {
         const el = document.getElementById('progress-text');
         const fill = document.getElementById('progress-fill');
+        if (data.membership_pending) {
+            const pct = ((data.paid_purchase_total || 0) / (data.activation_amount || 1) * 100).toFixed(1);
+            fill.style.width = Math.min(pct, 100) + '%';
+            el.textContent = 'Spend ₹' + ((data.activation_amount || 0) - (data.paid_purchase_total || 0)).toFixed(2) + ' more to activate membership';
+            return;
+        }
         if (data.next_level) {
             const pct = ((data.direct_at_level || 0) / data.next_level.required * 100).toFixed(1);
             fill.style.width = Math.min(pct, 100) + '%';

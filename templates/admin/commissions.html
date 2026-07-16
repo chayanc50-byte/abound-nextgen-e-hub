@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}Admin Commissions - Abound-E-Hub{% endblock %}
 {% block topbar_title %}Commissions{% endblock %}
 {% block breadcrumb %}<a href="{{ url_for('admin_dashboard') }}">Dashboard</a> > Commissions{% endblock %}
@@ -43,7 +43,7 @@
                 <td>{{ c.user.referral_id or '—' }}</td>
                 <td>#{{ c.order_id }}</td>
                 <td>₹{{ "%.2f"|format(c.commission_amount) }}</td>
-                <td>{{ c.commission_level_name or c.commission_level }}</td>
+                <td>{{ c.current_level_name }}</td>
                 <td><span class="badge badge-status-{{ (c.status or 'active')|lower }}">{{ c.status or 'active' }}</span></td>
             </tr>
             {% endfor %}

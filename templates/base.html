@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -36,11 +36,9 @@
                     <span class="accordion-arrow">▼</span>
                 </div>
                 <div class="accordion-content">
-                    {% if is_super_admin %}
                     <a href="{{ url_for('admin_users') }}" class="sidebar-subitem {% if request.endpoint == 'admin_users' %}active{% endif %}">All Users</a>
                     <a href="{{ url_for('admin_user_create') }}" class="sidebar-subitem {% if request.endpoint == 'admin_user_create' %}active{% endif %}">Create User</a>
                     <a href="{{ url_for('admin_reassign_user') }}" class="sidebar-subitem {% if request.endpoint == 'admin_reassign_user' %}active{% endif %}">Reassign User</a>
-                    {% endif %}
                     <a href="{{ url_for('admin_customers') }}" class="sidebar-subitem {% if request.endpoint == 'admin_customers' %}active{% endif %}">Customers</a>
                 </div>
             </div>
@@ -188,7 +186,10 @@
                 <span class="topbar-title">{% block topbar_title %}Dashboard{% endblock %}</span>
             </div>
             <div class="topbar-user">
-                <span class="topbar-name">{{ current_user.full_name if current_user else session.username }} ({{ current_user.level_name if current_user else session.get('level_name', 'Sales Executive') }})</span>
+                <span class="topbar-name">{{ current_user.full_name if current_user else session.username }} ({{ current_user.level_name if current_user else session.get('level_name', 'General Franchise') }})</span>
+                {% if current_user and current_user.is_sales_user and current_user.is_membership_pending %}
+                <span class="badge badge-status-pending-activation">Pending Activation</span>
+                {% endif %}
                 <a href="{{ url_for('logout') }}" class="topbar-logout">Logout</a>
             </div>
         </header>

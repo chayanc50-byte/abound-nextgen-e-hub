@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Create User - Super Admin{% endblock %}
+{% block title %}Create User - Admin{% endblock %}
 {% block breadcrumb %}<a href="{{ url_for('admin_dashboard') }}">Dashboard</a> > User Management > Create User{% endblock %}
 {% block content %}
 <div class="admin-page">
@@ -10,7 +10,9 @@
             <label>Role *</label>
             <select name="role" id="roleSelect">
                 <option value="user">Sales User</option>
+                {% if current_user.is_super_admin %}
                 <option value="admin">Admin</option>
+                {% endif %}
             </select>
         </div>
         <div class="form-group">

@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}My Team - Abound-E-Hub{% endblock %}
 {% block topbar_title %}My Team{% endblock %}
 {% block breadcrumb %}<a href="{{ url_for('dashboard') }}">Dashboard</a> > My Team{% endblock %}
@@ -8,6 +8,13 @@
         <h1>My Team</h1>
         <button class="btn btn-primary" onclick="openOnboardModal()">+ Onboard New Agent</button>
     </div>
+    {% if user.is_membership_pending %}
+    <div class="membership-pending-banner">
+        <span class="badge badge-status-pending-activation">Pending Activation</span>
+        <p>Please complete purchases of ₹4,999 to activate your membership and become part of your upline and downline.</p>
+        <p class="muted">Paid purchases: ₹{{ "%.2f"|format(paid_purchase_total or 0) }} / ₹{{ "%.2f"|format(membership_activation_amount) }}</p>
+    </div>
+    {% endif %}
 
     <div class="team-stats">
         <div class="stat-box">

@@ -3179,6 +3179,7 @@ body.internal-layout {
 .badge-status-delivered, .status-delivered .badge { background: #1B5E20; color: #fff; }
 .badge-status-cancelled, .status-cancelled .badge { background: #FFCDD2; color: #C62828; }
 .badge-status-active { background: #C8E6C9; color: #2E7D32; }
+.badge-status-pending-activation { background: #E5E7EB; color: #4B5563; }
 .badge-status-reversed { background: #FFCDD2; color: #C62828; }
 .badge-warning { background: #FFF3E0; color: #E65100; }
 
@@ -3198,6 +3199,19 @@ body.internal-layout {
     text-align: center;
     padding: 3rem;
     color: var(--text-light);
+}
+
+.membership-pending-banner {
+    margin: 1rem 0 1.5rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid #D1D5DB;
+    border-radius: var(--radius);
+    background: #F3F4F6;
+}
+
+.membership-pending-banner p {
+    margin: 0.5rem 0 0;
+    color: #4B5563;
 }
 
 /* Modal */

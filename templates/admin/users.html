@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}Admin Users - Abound-E-Hub{% endblock %}
 {% block topbar_title %}Users{% endblock %}
 {% block breadcrumb %}<a href="{{ url_for('admin_dashboard') }}">Dashboard</a> > User Management > All Users{% endblock %}
@@ -40,10 +40,14 @@
                 <td>{{ u.referral_id or '—' }}</td>
                 <td>{{ u.get_all_descendants()|length }}</td>
                 <td>
+                    {% if current_user.is_super_admin or u.user_role == 'user' %}
                     <a href="{{ url_for('admin_user', user_id=u.id) }}" class="btn btn-secondary btn-sm">Edit</a>
+                    {% endif %}
                     {% if u.user_role == 'user' %}
                     <a href="{{ url_for('admin_reassign_user', user_id=u.id) }}" class="btn btn-sm" style="background:#059669;color:white; margin-left: 0.25rem;">Reassign</a>
+                    {% if current_user.is_super_admin %}
                     <button type="button" class="btn btn-sm" style="background:#dc2626;color:white; margin-left: 0.25rem;" onclick="openDeleteModal({{ u.id }}, '{{ u.full_name | e }}')">Delete</button>
+                    {% endif %}
                     {% endif %}
                 </td>
             </tr>
@@ -54,6 +58,7 @@
 </div>
 
 <!-- Delete confirmation modal -->
+{% if current_user.is_super_admin %}
 <div id="delete-user-modal" class="modal" style="display: none;">
     <div class="modal-content">
         <h3>Delete User</h3>
@@ -65,7 +70,9 @@
         </div>
     </div>
 </div>
+{% endif %}
 
+{% if current_user.is_super_admin %}
 <script>
 let deleteTargetId = null;
 
@@ -120,4 +127,5 @@ document.getElementById('delete-user-modal').addEventListener('click', function(
     if (e.target === this) closeDeleteModal();
 });
 </script>
+{% endif %}
 {% endblock %}

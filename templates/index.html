@@ -23,13 +23,7 @@
         <div class="categories-grid">
             {% for c, product_count in categories %}
             <a href="{{ url_for('catalog', category_id=c.id) }}" class="category-card">
-                {% if c.image_url %}
-                    <div class="category-image">
-                        <img src="{{ c.image_url }}" alt="{{ c.name }}">
-                    </div>
-                {% else %}
-                    <div class="category-icon">📦</div>
-                {% endif %}
+                <div class="category-icon">📦</div>
                 <h3>{{ c.name }}</h3>
                 <p class="muted" style="margin: 0;">{{ product_count }} Product{% if product_count != 1 %}s{% endif %}</p>
             </a>

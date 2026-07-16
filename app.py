@@ -6,7 +6,7 @@ from datetime import datetime
 import os
 import random
 import string
-from sqlalchemy import text, or_
+from sqlalchemy import text, or_, func
 from dotenv import load_dotenv
 from integrations.resend_email import send_email
 
@@ -23,6 +23,9 @@ app.config['SECRET_KEY'] = os.environ.get(
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///sales_team.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'static', 'images')
+app.config['CATEGORY_UPLOAD_URL_PREFIX'] = '/static/uploads/categories'
+app.config['CATEGORY_UPLOAD_FOLDER'] = os.path.join(app.static_folder, 'uploads', 'categories')
+app.config['CATEGORY_PERSIST_FOLDER'] = os.path.join(app.instance_path, 'uploads', 'categories')
 # Email config - set in environment or .env for production
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
 app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
@@ -50,6 +53,32 @@ db = SQLAlchemy(app)
 # Firebase Admin (lazy init)
 _firebase_app = None
 _firebase_import_unavailable = False
+
+def ensure_category_upload_folder():
+    persist_dir = app.config['CATEGORY_PERSIST_FOLDER']
+    static_dir = app.config['CATEGORY_UPLOAD_FOLDER']
+    os.makedirs(persist_dir, exist_ok=True)
+    os.makedirs(os.path.dirname(static_dir), exist_ok=True)
+    if not os.path.exists(static_dir):
+        try:
+            os.symlink(persist_dir, static_dir, target_is_directory=True)
+        except Exception:
+            os.makedirs(static_dir, exist_ok=True)
+
+ensure_category_upload_folder()
+
+def save_category_image(file_storage):
+    if not file_storage or not getattr(file_storage, 'filename', ''):
+        return None
+    fn = secure_filename(file_storage.filename)
+    if not fn:
+        return None
+    ext = fn.rsplit('.', 1)[-1].lower() if '.' in fn else 'jpg'
+    fn = f"category_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{random.randint(1000,9999)}.{ext}"
+    up_dir = app.config['CATEGORY_UPLOAD_FOLDER']
+    os.makedirs(up_dir, exist_ok=True)
+    file_storage.save(os.path.join(up_dir, fn))
+    return f"{app.config['CATEGORY_UPLOAD_URL_PREFIX']}/{fn}"
 
 def get_firebase_app():
     global _firebase_app, _firebase_import_unavailable
@@ -454,6 +483,8 @@ class User(db.Model):
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(80), nullable=False)
+    image_url = db.Column(db.String(255))
+    is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     products = db.relationship('Product', backref='category', lazy='dynamic')
 
@@ -788,21 +819,38 @@ def download_apk():
 def pwa_offline():
     return render_template('offline.html', logo_url=get_logo_url())
 
+def get_active_categories_with_counts():
+    return (db.session.query(Category, func.count(Product.id).label('product_count'))
+        .outerjoin(Product, Product.category_id == Category.id)
+        .filter(or_(Category.is_active == True, Category.is_active.is_(None)))
+        .group_by(Category.id)
+        .order_by(Category.name)
+        .all())
+
 # Routes
 @app.route('/')
 def index():
     if 'user_id' in session:
         return redirect(url_for('dashboard'))
     products = Product.query.limit(8).all()
-    return render_template('index.html', products=products)
+    categories = get_active_categories_with_counts()
+    return render_template('index.html', products=products, categories=categories)
 
 @app.route('/catalog')
 def catalog():
     """Public product catalog - redirect to /products when logged in for sidebar layout."""
     if 'user_id' in session:
         return redirect(url_for('products'))
-    products = Product.query.all()
-    return render_template('catalog.html', products=products)
+    category_id = request.args.get('category_id', type=int)
+    q = Product.query
+    selected_category = None
+    if category_id:
+        selected_category = Category.query.get(category_id)
+        if selected_category:
+            q = q.filter(Product.category_id == category_id)
+    products = q.all()
+    categories = get_active_categories_with_counts()
+    return render_template('catalog.html', products=products, categories=categories, selected_category=selected_category)
 
 @app.route('/about')
 def about():
@@ -2254,6 +2302,16 @@ def migrate_db():
                     conn.execute(text(f"ALTER TABLE savings_account ADD COLUMN {col} {def_sql}"))
             except Exception:
                 pass
+    for col, def_sql in [('image_url', 'VARCHAR(255)'), ('is_active', 'INTEGER DEFAULT 1')]:
+        try:
+            with db.engine.connect() as conn:
+                conn.execute(text(f"SELECT {col} FROM category LIMIT 1"))
+        except Exception:
+            try:
+                with db.engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE category ADD COLUMN {col} {def_sql}"))
+            except Exception:
+                pass
     for col, def_sql in [('category_id', 'INTEGER'), ('stock_quantity', 'INTEGER'), ('sku', 'VARCHAR(50)'), ('weight', 'REAL'), ('dimensions', 'VARCHAR(100)')]:
         try:
             with db.engine.connect() as conn:
@@ -2689,7 +2747,11 @@ def admin_products():
 def admin_category_add():
     name = request.form.get('name', '').strip()
     if name:
-        cat = Category(name=name)
+        is_active = request.form.get('is_active') in ('1', 'on', 'true', 'yes')
+        cat = Category(name=name, is_active=is_active)
+        img = save_category_image(request.files.get('image'))
+        if img:
+            cat.image_url = img
         db.session.add(cat)
         db.session.commit()
         log_activity(session['user_id'], f'Created category: {name}', 'category', cat.id)
@@ -2704,9 +2766,13 @@ def admin_category_edit(cat_id):
     if name:
         old = cat.name
         cat.name = name
-        db.session.commit()
         log_activity(session['user_id'], f'Category renamed: {old} -> {name}', 'category', cat.id)
-        flash('Category updated', 'success')
+    cat.is_active = request.form.get('is_active') in ('1', 'on', 'true', 'yes')
+    img = save_category_image(request.files.get('image'))
+    if img:
+        cat.image_url = img
+    db.session.commit()
+    flash('Category updated', 'success')
     return redirect(url_for('admin_products'))
 
 @app.route('/admin-products/category/<int:cat_id>/delete', methods=['POST'])

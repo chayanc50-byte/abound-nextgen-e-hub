@@ -12,6 +12,14 @@
 
 <section class="section">
     <div class="container">
+        <div class="catalog-filters" style="margin-bottom: 1rem;">
+            <a href="{{ url_for('catalog') }}" class="btn btn-secondary btn-sm" style="margin-right: 8px; {% if not selected_category %}opacity:1;{% else %}opacity:0.7;{% endif %}">All</a>
+            {% for c, product_count in categories %}
+                <a href="{{ url_for('catalog', category_id=c.id) }}" class="btn btn-secondary btn-sm" style="margin-right: 8px; {% if selected_category and selected_category.id == c.id %}opacity:1;{% else %}opacity:0.7;{% endif %}">
+                    {{ c.name }} ({{ product_count }})
+                </a>
+            {% endfor %}
+        </div>
         <div class="products-grid public-products">
             {% for product in products %}
             <div class="product-card-wrapper">
@@ -25,6 +33,7 @@
                     </div>
                     <div class="product-info">
                         <h3>{{ product.name }}</h3>
+                        <p class="muted" style="margin: 0 0 6px 0;">{{ product.category.name if product.category else 'Uncategorized' }}</p>
                         {% if product.description %}<p class="product-description">{{ product.description[:80] }}{% if product.description|length > 80 %}...{% endif %}</p>{% endif %}
                         <p class="product-price">₹{{ "%.2f"|format(product.price) }}</p>
                         {% if product.is_out_of_stock %}
@@ -42,7 +51,7 @@
         </div>
         {% if not products %}
         <div class="empty-catalog">
-            <p>No products available yet. Check back soon!</p>
+            <p>No products available{% if selected_category %} in {{ selected_category.name }}{% endif %}. Check back soon!</p>
             <a href="{{ url_for('index') }}" class="btn btn-primary">Back to Home</a>
         </div>
         {% endif %}

@@ -7,21 +7,45 @@
     <h1>Product Management</h1>
     <div class="admin-section-card">
         <h2 class="section-title">Categories</h2>
-        <form method="POST" action="{{ url_for('admin_category_add') }}" class="inline-form">
+        <form method="POST" action="{{ url_for('admin_category_add') }}" class="inline-form" enctype="multipart/form-data">
             <input type="text" name="name" placeholder="New category name" required>
+            <input type="file" name="image" accept="image/*">
+            <label style="display:inline-flex; gap:6px; align-items:center;">
+                <input type="checkbox" name="is_active" value="1" checked>
+                Active
+            </label>
             <button type="submit" class="btn btn-primary">Add Category</button>
         </form>
         <div class="table-responsive">
         <table class="admin-table" style="margin-top: 0.5rem;">
-            <thead><tr><th>Category</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Category</th><th>Image</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>
             {% for c in categories %}
             <tr>
                 <td>{{ c.name }}</td>
                 <td>
-                    <form method="POST" action="{{ url_for('admin_category_edit', cat_id=c.id) }}" style="display:inline;">
-                        <input type="text" name="name" value="{{ c.name }}" style="width:120px;">
-                        <button type="submit" class="btn btn-secondary btn-sm">Save</button>
+                    {% if c.image_url %}
+                        <img src="{{ c.image_url }}" alt="{{ c.name }}" style="height:40px;">
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+                <td>
+                    {% if c.is_active %}
+                        <span class="badge badge-status-active">Active</span>
+                    {% else %}
+                        <span class="badge badge-status-cancelled">Inactive</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <form method="POST" action="{{ url_for('admin_category_edit', cat_id=c.id) }}" style="display:inline;" enctype="multipart/form-data">
+                        <input type="text" name="name" value="{{ c.name }}" style="width:160px;">
+                        <input type="file" name="image" accept="image/*">
+                        <label style="display:inline-flex; gap:6px; align-items:center; margin-left:6px;">
+                            <input type="checkbox" name="is_active" value="1" {% if c.is_active %}checked{% endif %}>
+                            Active
+                        </label>
+                        <button type="submit" class="btn btn-secondary btn-sm" style="margin-left:6px;">Save</button>
                     </form>
                     <form method="POST" action="{{ url_for('admin_category_delete', cat_id=c.id) }}" style="display:inline;" onsubmit="return confirm('Delete?');">
                         <button type="submit" class="btn btn-delete btn-sm">Delete</button>
@@ -30,7 +54,7 @@
             </tr>
             {% endfor %}
             {% if not categories %}
-            <tr><td colspan="2">No categories yet.</td></tr>
+            <tr><td colspan="4">No categories yet.</td></tr>
             {% endif %}
             </tbody>
         </table>

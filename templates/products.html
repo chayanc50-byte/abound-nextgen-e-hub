@@ -21,6 +21,7 @@
             </div>
             <div class="product-card-body">
                 <h3 class="product-card-name">{{ product.name }}</h3>
+                <p class="muted" style="margin: 0 0 6px 0;">{{ product.category.name if product.category else 'Uncategorized' }}</p>
                 <p class="product-card-desc">{{ (product.description or '')[:120] }}{% if (product.description or '')|length > 120 %}...{% endif %}</p>
                 <p class="product-card-price">₹{{ "%.2f"|format(product.price) }}</p>
                 {% if not product.is_out_of_stock %}

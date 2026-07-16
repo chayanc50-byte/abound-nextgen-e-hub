@@ -21,30 +21,22 @@
     <div class="container">
         <h2 class="section-title">Our Product Categories</h2>
         <div class="categories-grid">
-            <a href="{{ url_for('catalog') }}" class="category-card">
-                <div class="category-icon">🏠</div>
-                <h3>Household Essentials</h3>
+            {% for c, product_count in categories %}
+            <a href="{{ url_for('catalog', category_id=c.id) }}" class="category-card">
+                {% if c.image_url %}
+                    <div class="category-image">
+                        <img src="{{ c.image_url }}" alt="{{ c.name }}">
+                    </div>
+                {% else %}
+                    <div class="category-icon">📦</div>
+                {% endif %}
+                <h3>{{ c.name }}</h3>
+                <p class="muted" style="margin: 0;">{{ product_count }} Product{% if product_count != 1 %}s{% endif %}</p>
             </a>
-            <a href="{{ url_for('catalog') }}" class="category-card">
-                <div class="category-icon">🛒</div>
-                <h3>Grocery Products</h3>
-            </a>
-            <a href="{{ url_for('catalog') }}" class="category-card">
-                <div class="category-icon">💄</div>
-                <h3>Cosmetics</h3>
-            </a>
-            <a href="{{ url_for('catalog') }}" class="category-card">
-                <div class="category-icon">🧴</div>
-                <h3>Personal Care</h3>
-            </a>
-            <a href="{{ url_for('catalog') }}" class="category-card">
-                <div class="category-icon">🍳</div>
-                <h3>Kitchen Items</h3>
-            </a>
-            <a href="{{ url_for('catalog') }}" class="category-card">
-                <div class="category-icon">📦</div>
-                <h3>Daily Needs</h3>
-            </a>
+            {% endfor %}
+            {% if not categories %}
+            <div class="text-center muted" style="grid-column: 1 / -1;">No categories yet.</div>
+            {% endif %}
         </div>
     </div>
 </section>
@@ -54,7 +46,7 @@
         <h2 class="section-title">Popular Products</h2>
         <div class="products-grid public-products">
             {% for product in products %}
-            <a href="{{ url_for('login') }}" class="product-card-link">
+            <div class="product-card-wrapper">
                 <div class="product-card">
                     <div class="product-image">
                         {% if product.image_url %}
@@ -66,10 +58,17 @@
                     <div class="product-info">
                         <h3>{{ product.name }}</h3>
                         <p class="product-price">₹{{ "%.2f"|format(product.price) }}</p>
-                        <span class="btn btn-primary btn-sm">View & Buy</span>
+                        {% if product.is_out_of_stock %}
+                        <p class="out-of-stock">Out of Stock</p>
+                        {% else %}
+                        <div class="product-buttons">
+                            <a href="{{ url_for('login') }}" class="btn btn-secondary btn-sm">Login to Buy</a>
+                            <a href="{{ url_for('retail_checkout', product_id=product.id) }}" class="btn btn-primary btn-sm">Buy Now (Retail)</a>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
-            </a>
+            </div>
             {% endfor %}
         </div>
         {% if not products %}
@@ -81,6 +80,21 @@
         {% endif %}
     </div>
 </section>
+
+<style>
+.product-card-wrapper {
+    display: block;
+}
+.product-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+.product-buttons .btn {
+    flex: 1;
+    text-align: center;
+}
+</style>
 
 <section class="section section-alt">
     <div class="container">

@@ -1,11 +1,11 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#ff7a00">
-    <title>{% block title %}Abound Next-Gen E-Hub{% endblock %}</title>
+    <title>{% block title %}Abound-E-Hub{% endblock %}</title>
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/icon-192.png') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -19,7 +19,7 @@
     <aside class="app-sidebar" id="app-sidebar">
         <div class="sidebar-header">
             {% if logo_url %}<img src="{{ logo_url }}" alt="Logo" class="sidebar-logo">{% endif %}
-            <h2 class="sidebar-brand">Abound Next-Gen E-Hub</h2>
+            <h2 class="sidebar-brand">Abound-E-Hub</h2>
             <span class="sidebar-subtitle">An Abound Entertainment Venture</span>
         </div>
         <nav class="sidebar-nav">
@@ -30,19 +30,20 @@
                     <span class="sidebar-icon">📊</span> Dashboard
                 </a>
             </div>
-            {% if is_super_admin %}
             <div class="sidebar-accordion" data-menu="users">
-                <div class="sidebar-item accordion-toggle {% if request.endpoint in ['admin_users','admin_user','admin_user_create','admin_reassign_user'] %}active{% endif %}">
-                    <span class="sidebar-icon">👥</span> User Management
+                <div class="sidebar-item accordion-toggle {% if request.endpoint in ['admin_users','admin_user','admin_user_create','admin_reassign_user','admin_customers'] %}active{% endif %}">
+                    <span class="sidebar-icon">👥</span> Users
                     <span class="accordion-arrow">▼</span>
                 </div>
                 <div class="accordion-content">
+                    {% if is_super_admin %}
                     <a href="{{ url_for('admin_users') }}" class="sidebar-subitem {% if request.endpoint == 'admin_users' %}active{% endif %}">All Users</a>
                     <a href="{{ url_for('admin_user_create') }}" class="sidebar-subitem {% if request.endpoint == 'admin_user_create' %}active{% endif %}">Create User</a>
                     <a href="{{ url_for('admin_reassign_user') }}" class="sidebar-subitem {% if request.endpoint == 'admin_reassign_user' %}active{% endif %}">Reassign User</a>
+                    {% endif %}
+                    <a href="{{ url_for('admin_customers') }}" class="sidebar-subitem {% if request.endpoint == 'admin_customers' %}active{% endif %}">Customers</a>
                 </div>
             </div>
-            {% endif %}
             <div class="sidebar-accordion" data-menu="products">
                 <div class="sidebar-item accordion-toggle {% if request.endpoint in ['admin_products','admin_product_add','admin_product_edit'] %}active{% endif %}">
                     <span class="sidebar-icon">📦</span> Products
@@ -212,7 +213,7 @@
     <!-- PWA Install Banner -->
     <div id="pwa-install-banner" class="pwa-install-banner" style="display:none;" aria-hidden="true">
         <div class="pwa-install-content">
-            <span class="pwa-install-text">Install Abound NextGen E Hub</span>
+            <span class="pwa-install-text">Install Abound-E-Hub</span>
             <div class="pwa-install-actions">
                 <button type="button" class="pwa-install-btn" id="pwa-install-btn">Install</button>
                 <button type="button" class="pwa-install-dismiss" id="pwa-install-dismiss" aria-label="Dismiss">&times;</button>

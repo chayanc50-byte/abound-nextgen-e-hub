@@ -1,5 +1,5 @@
-{% extends "base.html" %}
-{% block title %}{{ 'Edit Address' if is_edit else 'Add Address' }} - Abound Next-Gen E-Hub{% endblock %}
+﻿{% extends "base.html" %}
+{% block title %}{{ 'Edit Address' if is_edit else 'Add Address' }} - Abound-E-Hub{% endblock %}
 {% block topbar_title %}{{ 'Edit Address' if is_edit else 'Add New Address' }}{% endblock %}
 {% block breadcrumb %}<a href="{{ url_for('dashboard') }}">Dashboard</a> > <a href="{{ url_for('profile_addresses') }}">My Addresses</a> > {{ 'Edit' if is_edit else 'Add' }}{% endblock %}
 {% block content %}

@@ -1,6 +1,6 @@
-{% extends "base_public.html" %}
+﻿{% extends "base_public.html" %}
 
-{% block title %}Retail Checkout - Abound Next-Gen E-Hub{% endblock %}
+{% block title %}Retail Checkout - Abound-E-Hub{% endblock %}
 
 {% block content %}
 <section class="section catalog-hero" style="padding: 2rem 0;">
@@ -42,7 +42,8 @@
                             <h3>Select Sales Member</h3>
                             <div class="form-group">
                                 <select id="assigned_member_id" name="assigned_member_id" class="input-select" required>
-                                    <option value="">-- Select a Sales Member --</option>
+                                    <option value="">Select Sales Member...</option>
+                                    <option value="none">Continue without Sales Member</option>
                                     {% for member in sales_members %}
                                     <option value="{{ member.id }}">{{ member.full_name }} ({{ member.referral_id or 'No Referral ID' }})</option>
                                     {% endfor %}
@@ -95,7 +96,7 @@
 <script>
 window.RETAIL_CHECKOUT_CONFIG = {
     razorpayKeyId: {{ razorpay_key_id|tojson }},
-    businessName: 'Abound NextGen E Hub',
+    businessName: 'Abound-E-Hub',
     productName: {{ product.name|tojson }},
     productId: {{ product.id }},
     quantity: {{ quantity }},

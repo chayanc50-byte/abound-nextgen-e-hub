@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Customers - Admin{% endblock %}
+{% block topbar_title %}Customers{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('admin_dashboard') }}">Dashboard</a> > Users > Customers{% endblock %}
+
+{% block content %}
+<div class="admin-page">
+    <h1>Customers</h1>
+    <div class="admin-section-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+            <h2 class="section-title" style="margin:0;">Customer Directory</h2>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <a href="{{ url_for('admin_customers', sort='points_desc') }}" class="btn btn-secondary btn-sm {% if sort == 'points_desc' %}active{% endif %}">Savings Points High-Low</a>
+                <a href="{{ url_for('admin_customers', sort='points_asc') }}" class="btn btn-secondary btn-sm {% if sort == 'points_asc' %}active{% endif %}">Savings Points Low-High</a>
+            </div>
+        </div>
+
+        {% if customers %}
+        <div class="table-responsive" style="margin-top: 1rem;">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Customer Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Savings Points</th>
+                        <th>Lifetime Savings Points</th>
+                        <th>Related Sales Member</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for customer in customers %}
+                    <tr>
+                        <td>{{ customer.full_name }}</td>
+                        <td>{{ customer.email }}</td>
+                        <td>{{ customer.phone or '—' }}</td>
+                        <td>{{ customer.savings_account.current_points or 0 }}</td>
+                        <td>{{ customer.savings_account.lifetime_points or 0 }}</td>
+                        <td>{{ customer.assigned_member.full_name if customer.assigned_member else 'None' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="muted" style="margin-top: 1rem;">No customers yet.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

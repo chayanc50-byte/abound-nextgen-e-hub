@@ -1478,7 +1478,6 @@ def retail_checkout():
 @app.route('/api/retail-checkout/prepare-pending', methods=['POST'])
 def retail_checkout_prepare_pending():
     """Prepare pending order for retail checkout (no login required)."""
-    # First, get the customer info and selected sales member
     product_id = request.form.get('product_id', type=int)
     if not product_id:
         return jsonify({'error': 'product_id is required'}), 400
@@ -1495,20 +1494,21 @@ def retail_checkout_prepare_pending():
     phone = request.form.get('phone', '').strip()
     email = request.form.get('email', '').strip()
     shipping_address = request.form.get('shipping_address', '').strip()
-    assigned_member_id = request.form.get('assigned_member_id', type=int)
+    assigned_member_raw = request.form.get('assigned_member_id', '').strip()
     
-    if not all([full_name, phone, email, shipping_address, assigned_member_id]):
+    if not all([full_name, phone, email, shipping_address]) or assigned_member_raw == '':
         return jsonify({'error': 'Please fill all fields'}), 400
     
-    # Validate assigned member is an active sales user
-    assigned_member = User.query.filter_by(id=assigned_member_id, user_role='user', user_status='active').first()
-    if not assigned_member:
-        return jsonify({'error': 'Invalid sales member selected'}), 400
+    assigned_member_id = None
+    if assigned_member_raw != 'none':
+        try:
+            assigned_member_id = int(assigned_member_raw)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'Invalid sales member selected'}), 400
+        assigned_member = User.query.filter_by(id=assigned_member_id, user_role='user', user_status='active').first()
+        if not assigned_member:
+            return jsonify({'error': 'Invalid sales member selected'}), 400
     
-    # Create a temporary order or just store the data in session for now? Wait, we need to create an order but without a user yet?
-    # Wait, let's create a pending order but we need to assign user later. Wait no, let's first store all the data in session, then after payment, create the customer/order.
-    # Wait, let's store the checkout data in session, create a pending order (maybe with a temporary user? Or wait, let's create the order after payment is verified.)
-    # Alternatively, let's store all the checkout info in session, then in verify-payment, we process it. Let's do that.
     session['retail_checkout_data'] = {
         'product_id': product_id,
         'quantity': quantity,
@@ -1693,6 +1693,24 @@ def customer_dashboard():
     assigned_member = User.query.get(user.assigned_member_id)
     return render_template('customer_dashboard.html', user=user, savings_account=savings_account,
         orders=orders, assigned_member=assigned_member)
+
+@app.route('/admin/customers')
+@require_admin
+def admin_customers():
+    """Admin customer list with savings-point sorting."""
+    sort = request.args.get('sort', 'points_desc')
+    customers = User.query.filter_by(user_role='customer').all()
+    for customer in customers:
+        customer.savings_account = get_or_create_savings_account(customer.id)
+        customer.assigned_member = User.query.get(customer.assigned_member_id)
+
+    if sort == 'points_asc':
+        customers.sort(key=lambda c: ((c.savings_account.current_points or 0), (c.full_name or '').lower()))
+    else:
+        customers.sort(key=lambda c: (-(c.savings_account.current_points or 0), (c.full_name or '').lower()))
+        sort = 'points_desc'
+
+    return render_template('admin/customers.html', customers=customers, sort=sort)
 
 @app.route('/admin/customer-rewards')
 @require_admin

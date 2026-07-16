@@ -1,5 +1,5 @@
-{% extends "base.html" %}
-{% block title %}Checkout - Abound Next-Gen E-Hub{% endblock %}
+﻿{% extends "base.html" %}
+{% block title %}Checkout - Abound-E-Hub{% endblock %}
 {% block topbar_title %}Checkout{% endblock %}
 {% block breadcrumb %}<a href="{{ url_for('dashboard') }}">Dashboard</a> > <a href="{{ url_for('products') }}">Products</a> > Checkout{% endblock %}
 {% block content %}
@@ -194,7 +194,7 @@
 <script>
 window.CHECKOUT_CONFIG = {
     razorpayKeyId: {{ razorpay_key_id|tojson }},
-    businessName: 'Abound NextGen E Hub',
+    businessName: 'Abound-E-Hub',
     userName: {{ (user.full_name or '')|tojson }},
     userEmail: {{ (user.email or '')|tojson }},
     userPhone: {{ (user.phone or '')|tojson }},

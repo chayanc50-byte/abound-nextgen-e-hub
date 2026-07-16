@@ -1,11 +1,11 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#ff7a00">
-    <title>{% block title %}Abound Next-Gen E-Hub{% endblock %}</title>
+    <title>{% block title %}Abound-E-Hub{% endblock %}</title>
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/icon-192.png') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,8 +21,8 @@
                     <span class="hamburger-icon">☰</span>
                 </button>
                 <a href="{{ url_for('index') }}" class="header-brand">
-                    {% if logo_url %}<img src="{{ logo_url }}" alt="Abound Next-Gen E-Hub" class="header-logo">{% endif %}
-                    <span class="header-brand-text">Abound Next-Gen E-Hub</span>
+                    {% if logo_url %}<img src="{{ logo_url }}" alt="Abound-E-Hub" class="header-logo">{% endif %}
+                    <span class="header-brand-text">Abound-E-Hub</span>
                 </a>
             </div>
             <nav class="header-nav">
@@ -93,14 +93,14 @@
                     <a href="{{ url_for('register') }}">Register</a>
                 </div>
             </div>
-            <p class="footer-copy">© 2026 Abound Next-Gen E-Hub. An Abound Entertainment Venture.</p>
+            <p class="footer-copy">© 2026 Abound-E-Hub. An Abound Entertainment Venture.</p>
         </div>
     </footer>
 
     <!-- PWA Install Banner -->
     <div id="pwa-install-banner" class="pwa-install-banner" style="display:none;" aria-hidden="true">
         <div class="pwa-install-content">
-            <span class="pwa-install-text">Install Abound NextGen E Hub</span>
+            <span class="pwa-install-text">Install Abound-E-Hub</span>
             <div class="pwa-install-actions">
                 <button type="button" class="pwa-install-btn" id="pwa-install-btn">Install</button>
                 <button type="button" class="pwa-install-dismiss" id="pwa-install-dismiss" aria-label="Dismiss">&times;</button>

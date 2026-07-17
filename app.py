@@ -22,7 +22,8 @@ app.config['SECRET_KEY'] = os.environ.get(
 )
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///sales_team.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'static', 'images')
+app.config['UPLOAD_FOLDER'] = os.path.join(app.instance_path, 'images')
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 app.config['CATEGORY_UPLOAD_URL_PREFIX'] = '/static/uploads/categories'
 app.config['CATEGORY_UPLOAD_FOLDER'] = os.path.join(app.static_folder, 'uploads', 'categories')
 app.config['CATEGORY_PERSIST_FOLDER'] = os.path.join(app.instance_path, 'uploads', 'categories')
@@ -887,6 +888,10 @@ def download_apk():
         as_attachment=True,
         download_name='abound-ehub.apk'
     )
+
+@app.route('/uploads/<path:filename>')
+def uploaded_product_image(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 @app.route('/offline')
 def pwa_offline():

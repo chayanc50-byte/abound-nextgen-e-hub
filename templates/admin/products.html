@@ -73,7 +73,7 @@
         <tbody>
             {% for p in products %}
             <tr>
-                <td>{% if p.image_url %}<img src="{{ p.image_url }}" alt="" style="height:40px;">{% else %}—{% endif %}</td>
+                <td>{% if p.image_url %}<img src="{{ url_for('uploaded_product_image', filename=p.image_url.rsplit('/', 1)[-1]) }}" alt="" style="height:40px;">{% else %}—{% endif %}</td>
                 <td>{{ p.name }}</td>
                 <td>{{ p.category.name if p.category else '—' }}</td>
                 <td>₹{{ "%.2f"|format(p.price) }}</td>

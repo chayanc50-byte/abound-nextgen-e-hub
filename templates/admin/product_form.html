@@ -51,7 +51,7 @@
         <div class="form-group">
             <label>Product Image</label>
             {% if product and product.image_url %}
-            <p><img src="{{ product.image_url }}" alt="" style="max-height: 100px; margin-bottom: 0.5rem;"></p>
+            <p><img src="{{ url_for('uploaded_product_image', filename=product.image_url.rsplit('/', 1)[-1]) }}" alt="" style="max-height: 100px; margin-bottom: 0.5rem;"></p>
             {% endif %}
             <input type="file" name="image" accept="image/*">
         </div>

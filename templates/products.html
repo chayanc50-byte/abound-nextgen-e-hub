@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}Products - Abound-E-Hub{% endblock %}
 {% block topbar_title %}Products{% endblock %}
 {% block breadcrumb %}<a href="{{ url_for('dashboard') }}">Dashboard</a> > Products{% endblock %}
@@ -23,7 +23,18 @@
                 <h3 class="product-card-name">{{ product.name }}</h3>
                 <p class="muted" style="margin: 0 0 6px 0;">{{ product.category.name if product.category else 'Uncategorized' }}</p>
                 <p class="product-card-desc">{{ (product.description or '')[:120] }}{% if (product.description or '')|length > 120 %}...{% endif %}</p>
+                {% if user and user.is_sales_user and product.has_member_discount %}
+                <p class="product-card-price" style="margin-bottom: 4px;">
+                    <span style="text-decoration: line-through; opacity: 0.7;">₹{{ "%.2f"|format(product.price) }}</span>
+                    <span style="color: #d97706; font-weight: 700; margin-left: 8px;">₹{{ "%.2f"|format(product.member_price) }}</span>
+                </p>
+                <p class="muted" style="margin: 0 0 8px 0;">
+                    <span style="font-weight: 600;">Member Price</span>
+                    <span class="badge" style="margin-left: 8px;">You Save {{ "%.0f"|format(product.member_discount_percent) }}%</span>
+                </p>
+                {% else %}
                 <p class="product-card-price">₹{{ "%.2f"|format(product.price) }}</p>
+                {% endif %}
                 {% if not product.is_out_of_stock %}
                 <div class="product-card-actions">
                     <label class="qty-label">Quantity</label>

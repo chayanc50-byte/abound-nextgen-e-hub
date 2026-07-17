@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}Checkout - Abound-E-Hub{% endblock %}
 {% block topbar_title %}Checkout{% endblock %}
 {% block breadcrumb %}<a href="{{ url_for('dashboard') }}">Dashboard</a> > <a href="{{ url_for('products') }}">Products</a> > Checkout{% endblock %}
@@ -26,9 +26,24 @@
                         </div>
                         <div class="summary-details">
                             <h4>{{ product.name }}</h4>
+                            {% if user and user.is_sales_user and product.has_member_discount %}
+                            <p class="summary-price" style="margin-bottom: 4px;">
+                                <span style="text-decoration: line-through; opacity: 0.7;">₹{{ "%.2f"|format(product.price) }}</span>
+                                <span style="color: #d97706; font-weight: 700; margin-left: 8px;">₹{{ "%.2f"|format(product.member_price) }}</span>
+                            </p>
+                            <p class="muted" style="margin: 0 0 8px 0;">
+                                <span style="font-weight: 600;">Member Price</span>
+                                <span class="badge" style="margin-left: 8px;">You Save {{ "%.0f"|format(product.member_discount_percent) }}%</span>
+                            </p>
+                            {% else %}
                             <p class="summary-price">₹{{ "%.2f"|format(product.price) }}</p>
+                            {% endif %}
                             <p class="summary-qty">Quantity: {{ quantity }}</p>
+                            {% if user and user.is_sales_user %}
+                            <p class="summary-subtotal"><strong>Subtotal: ₹{{ "%.2f"|format(product.member_price * quantity) }}</strong></p>
+                            {% else %}
                             <p class="summary-subtotal"><strong>Subtotal: ₹{{ "%.2f"|format(product.price * quantity) }}</strong></p>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -127,7 +142,11 @@
             <div class="checkout-sidebar">
                 <div class="checkout-card checkout-order-card">
                     <h3>Order Total</h3>
+                    {% if user and user.is_sales_user %}
+                    <p class="order-total">₹{{ "%.2f"|format(product.member_price * quantity) }}</p>
+                    {% else %}
                     <p class="order-total">₹{{ "%.2f"|format(product.price * quantity) }}</p>
+                    {% endif %}
                     <p id="razorpay-error" class="razorpay-error" style="display:none;"></p>
                     <button type="submit" class="btn-place-order" id="place-order-btn"{% if not addresses %} disabled{% endif %}>
                         <span class="btn-text">{% if razorpay_key_id %}Pay Now{% else %}Place Order{% endif %}</span>

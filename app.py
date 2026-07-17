@@ -533,6 +533,7 @@ class Product(db.Model):
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
     price = db.Column(db.Float, nullable=False)
+    member_discount_percent = db.Column(db.Float, default=0)
     image_url = db.Column(db.String(255))
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True)
     stock_quantity = db.Column(db.Integer, nullable=True)  # None = unlimited, 0 = out of stock
@@ -544,6 +545,15 @@ class Product(db.Model):
     @property
     def is_out_of_stock(self):
         return self.stock_quantity == 0
+
+    @property
+    def has_member_discount(self):
+        return (self.member_discount_percent or 0) > 0
+
+    @property
+    def member_price(self):
+        discount_percent = min(max(self.member_discount_percent or 0, 0), 100)
+        return round(self.price - (self.price * discount_percent / 100.0), 2)
 
 class Address(db.Model):
     """Saved delivery address for a user."""
@@ -1230,13 +1240,13 @@ def checkout_prepare_pending():
     fields, msg = _parse_checkout_shipping(user, product_id, quantity)
     if msg:
         return jsonify({'error': msg}), 400
-    amount_paise = int(round(product.price * quantity * 100))
+    amount_paise = int(round(product.member_price * quantity * 100))
     if amount_paise < 100:
         return jsonify({'error': 'Amount must be at least ₹1.00 (100 paise).'}), 400
     order = Order(
         user_id=user.id,
         product_id=product.id,
-        amount=product.price,
+        amount=product.member_price,
         quantity=quantity,
         shipping_address=fields['shipping_address'],
         shipment_notes=fields['shipment_notes'],
@@ -1435,7 +1445,7 @@ def place_order(product_id):
         flash('Please enter a valid 6-digit PIN code.', 'error')
         return redirect(url_for('checkout', productId=product_id, qty=quantity))
     order = Order(
-        user_id=user.id, product_id=product.id, amount=product.price, quantity=quantity,
+        user_id=user.id, product_id=product.id, amount=product.member_price, quantity=quantity,
         shipping_address=shipping_address, shipment_notes=shipment_notes, phone=phone or None,
         payment_status='Paid'
     )
@@ -1831,7 +1841,7 @@ def create_order(product_id):
         shipping_address = user.address or ''
     if not phone:
         phone = user.phone or ''
-    order = Order(user_id=user.id, product_id=product.id, amount=product.price, quantity=quantity,
+    order = Order(user_id=user.id, product_id=product.id, amount=product.member_price, quantity=quantity,
         shipping_address=shipping_address or None, phone=phone or None, payment_status='Paid')
     db.session.add(order)
     decrement_tracked_stock(product, quantity)
@@ -2413,7 +2423,7 @@ def migrate_db():
                     conn.execute(text(f"ALTER TABLE category ADD COLUMN {col} {def_sql}"))
             except Exception:
                 pass
-    for col, def_sql in [('category_id', 'INTEGER'), ('stock_quantity', 'INTEGER'), ('sku', 'VARCHAR(50)'), ('weight', 'REAL'), ('dimensions', 'VARCHAR(100)')]:
+    for col, def_sql in [('category_id', 'INTEGER'), ('stock_quantity', 'INTEGER'), ('sku', 'VARCHAR(50)'), ('weight', 'REAL'), ('dimensions', 'VARCHAR(100)'), ('member_discount_percent', 'REAL DEFAULT 0')]:
         try:
             with db.engine.connect() as conn:
                 conn.execute(text(f"SELECT {col} FROM product LIMIT 1"))
@@ -2912,12 +2922,16 @@ def admin_product_add():
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
         price = request.form.get('price', type=float)
+        member_discount_percent = request.form.get('member_discount_percent', type=float)
         category_id = request.form.get('category_id', type=int)
         description = request.form.get('description', '')
         stock_quantity = request.form.get('stock_quantity', type=int)
         sku = request.form.get('sku', '').strip()
         weight = request.form.get('weight', type=float)
         dimensions = request.form.get('dimensions', '')
+        if member_discount_percent is None:
+            member_discount_percent = 0
+        member_discount_percent = min(max(member_discount_percent, 0), 100)
         if not name or price is None:
             flash('Name and price required', 'error')
             return redirect(url_for('admin_product_add'))
@@ -2935,7 +2949,8 @@ def admin_product_add():
                     img_path = f'/static/images/{fn}'
         p = Product(name=name, price=price, description=description or None, image_url=img_path,
             category_id=category_id if category_id else None, stock_quantity=stock_quantity if stock_quantity is not None else None,
-            sku=sku or generate_product_sku(), weight=weight if weight else None, dimensions=dimensions or None)
+            sku=sku or generate_product_sku(), weight=weight if weight else None, dimensions=dimensions or None,
+            member_discount_percent=member_discount_percent)
         db.session.add(p)
         db.session.commit()
         log_activity(session['user_id'], f'Created product: {name}', 'product', p.id)
@@ -2951,8 +2966,11 @@ def admin_product_edit(prod_id):
     if request.method == 'POST':
         p.name = request.form.get('name', '').strip() or p.name
         price = request.form.get('price', type=float)
+        member_discount_percent = request.form.get('member_discount_percent', type=float)
         if price is not None:
             p.price = price
+        if member_discount_percent is not None:
+            p.member_discount_percent = min(max(member_discount_percent, 0), 100)
         p.category_id = request.form.get('category_id', type=int) or None
         p.description = request.form.get('description', '') or None
         p.stock_quantity = request.form.get('stock_quantity', type=int) if request.form.get('stock_quantity') != '' else None

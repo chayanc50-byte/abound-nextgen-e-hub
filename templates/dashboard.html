@@ -21,7 +21,7 @@
                 <div class="stat-content">
                     <h3 class="referral-code">{{ user.referral_id or '—' }}</h3>
                     <p>Your Referral ID</p>
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="copyText('{{ user.referral_id or '' }}')">Copy</button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-referral-id="{{ user.referral_id or '' }}" onclick="copyText(this.dataset.referralId)">Copy</button>
                 </div>
             </div>
             <div class="stat-card">
@@ -69,7 +69,10 @@
             <div class="stat-card"><h4>Available Balance</h4><h3>₹{{ "%.2f"|format(wallet.available_balance or 0) }}</h3></div>
             <div class="stat-card"><h4>Withdrawn</h4><h3>₹{{ "%.2f"|format(wallet.withdrawn_balance or 0) }}</h3></div>
         </div>
-        <p><a href="{{ url_for('my_commissions') }}" class="btn btn-secondary btn-sm">View Commission History</a></p>
+        <p>
+            <a href="{{ url_for('my_commissions') }}" class="btn btn-secondary btn-sm">View Commission History</a>
+            <a href="{{ url_for('commission_statement') }}" class="btn btn-secondary btn-sm">Commission Statement</a>
+        </p>
     </div>
 
     <div class="quick-actions">
@@ -139,6 +142,25 @@
             <a href="{{ url_for('my_team') }}" class="btn btn-primary">My Team & Structure</a>
             <a href="{{ url_for('products') }}" class="btn btn-secondary">View Products</a>
         </div>
+    </div>
+
+    <div class="quick-actions">
+        <h2>Bank Details</h2>
+        <form method="POST" class="login-form" style="max-width: 500px;">
+            <div class="form-group">
+                <label>Bank Name</label>
+                <input type="text" name="bank_name" value="{{ user.bank_name or '' }}">
+            </div>
+            <div class="form-group">
+                <label>Account Number</label>
+                <input type="text" name="bank_account_number" value="{{ user.bank_account_number or '' }}">
+            </div>
+            <div class="form-group">
+                <label>IFSC</label>
+                <input type="text" name="bank_ifsc" value="{{ user.bank_ifsc or '' }}">
+            </div>
+            <button type="submit" class="btn btn-primary">Save Bank Details</button>
+        </form>
     </div>
 
     <div class="quick-actions levels-section">

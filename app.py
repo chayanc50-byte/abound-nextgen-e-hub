@@ -407,6 +407,9 @@ class User(db.Model):
     user_role = db.Column(db.String(20), default='user')  # user, admin, super_admin, customer
     phone = db.Column(db.String(20), nullable=True)
     address = db.Column(db.String(255), nullable=True)
+    bank_name = db.Column(db.String(120), nullable=True)
+    bank_account_number = db.Column(db.String(50), nullable=True)
+    bank_ifsc = db.Column(db.String(20), nullable=True)
     # Legacy: position kept for migration, maps to user_level
     position = db.Column(db.String(80), nullable=True)
     # For retail customers: assigned sales member
@@ -535,6 +538,7 @@ class Product(db.Model):
     description = db.Column(db.Text)
     price = db.Column(db.Float, nullable=False)
     member_discount_percent = db.Column(db.Float, default=0)
+    savings_point = db.Column(db.Integer, default=0)
     image_url = db.Column(db.String(255))
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True)
     stock_quantity = db.Column(db.Integer, nullable=True)  # None = unlimited, 0 = out of stock
@@ -668,6 +672,20 @@ class Commission(db.Model):
     def current_level_name(self):
         return next((n for l, n in hierarchy_config.LEVELS if l == self.commission_level), self.commission_level_name or self.commission_level)
 
+class CommissionLedger(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
+    commission_id = db.Column(db.Integer, db.ForeignKey('commission.id'), nullable=True, unique=True)
+    commission_amount = db.Column(db.Float, nullable=False)
+    commission_date = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(20), default='Pending')  # Pending, Paid
+    paid_date = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user = db.relationship('User', backref='commission_ledger_entries')
+    order = db.relationship('Order', backref='commission_ledger_entries')
+    commission = db.relationship('Commission', backref=db.backref('ledger_entry', uselist=False))
+
 def log_activity(admin_id, action, target_type=None, target_id=None, details=None):
     """Record admin activity for audit trail."""
     db.session.add(ActivityLog(admin_id=admin_id, action=action, target_type=target_type, target_id=target_id, details=details))
@@ -746,6 +764,24 @@ def get_or_create_wallet(user_id):
         db.session.add(w)
     return w
 
+def ensure_commission_ledger_entry(commission):
+    """Create one ledger entry per commission earning if missing."""
+    if not commission:
+        return None
+    entry = CommissionLedger.query.filter_by(commission_id=commission.id).first()
+    if entry:
+        return entry
+    entry = CommissionLedger(
+        user_id=commission.user_id,
+        order_id=commission.order_id,
+        commission_id=commission.id,
+        commission_amount=commission.commission_amount,
+        commission_date=commission.created_at or datetime.utcnow(),
+        status='Pending'
+    )
+    db.session.add(entry)
+    return entry
+
 def get_or_create_savings_account(customer_id):
     """Get or create savings account for retail customer."""
     sa = SavingsAccount.query.filter_by(customer_id=customer_id).first()
@@ -772,6 +808,43 @@ def refresh_membership_activation(user_id):
         user.activated_at = datetime.utcnow()
     db.session.commit()
     return True
+
+def activate_membership_network(user):
+    """Activate selected sales member plus their sales upline and downline."""
+    if not user or not user.is_sales_user:
+        return False
+
+    changed = False
+    visited = set()
+
+    def activate_member(member):
+        nonlocal changed
+        if not member or member.id in visited or not member.is_sales_user:
+            return
+        visited.add(member.id)
+        if member.membership_status != 'active':
+            member.membership_status = 'active'
+            changed = True
+        if not member.activated_at:
+            member.activated_at = datetime.utcnow()
+            changed = True
+
+    current = user
+    while current and current.is_sales_user:
+        activate_member(current)
+        current = current.parent
+
+    queue = [user]
+    while queue:
+        current = queue.pop(0)
+        for child in current.children.all():
+            if child.is_sales_user:
+                activate_member(child)
+                queue.append(child)
+
+    if changed:
+        db.session.commit()
+    return changed
 
 def distribute_commission(order):
     """Sponsor-based commission: buyer gets 0. Level 1=sponsor, Level 2=sponsor's upline, etc.
@@ -801,6 +874,8 @@ def distribute_commission(order):
         comm = Commission(user_id=upline_user.id, order_id=order.id, commission_amount=comm_amount,
             commission_percent=pct, commission_level=level, commission_level_name=level_name, status='active')
         db.session.add(comm)
+        db.session.flush()
+        ensure_commission_ledger_entry(comm)
         w = get_or_create_wallet(upline_user.id)
         w.total_earnings = (w.total_earnings or 0) + comm_amount
         w.available_balance = (w.available_balance or 0) + comm_amount
@@ -813,6 +888,9 @@ def reverse_commission(order):
         return
     for comm in Commission.query.filter_by(order_id=order.id, status='active').all():
         comm.status = 'reversed'
+        pending_ledger = CommissionLedger.query.filter_by(commission_id=comm.id, status='Pending').first()
+        if pending_ledger:
+            db.session.delete(pending_ledger)
         w = Wallet.query.filter_by(user_id=comm.user_id).first()
         if w:
             w.available_balance = max(0, (w.available_balance or 0) - comm.commission_amount)
@@ -823,6 +901,9 @@ def reverse_commission(order):
 def _clear_order_commissions(order):
     """Remove commission records for an order and adjust wallets. Used before recalculating."""
     for comm in Commission.query.filter_by(order_id=order.id, status='active').all():
+        pending_ledger = CommissionLedger.query.filter_by(commission_id=comm.id, status='Pending').first()
+        if pending_ledger:
+            db.session.delete(pending_ledger)
         w = Wallet.query.filter_by(user_id=comm.user_id).first()
         if w:
             w.available_balance = max(0, (w.available_balance or 0) - comm.commission_amount)
@@ -1052,7 +1133,7 @@ def logout():
     flash('You have been logged out', 'info')
     return redirect(url_for('login'))
 
-@app.route('/dashboard')
+@app.route('/dashboard', methods=['GET', 'POST'])
 def dashboard():
     if 'user_id' not in session:
         return redirect(url_for('login'))
@@ -1064,6 +1145,14 @@ def dashboard():
         return redirect(url_for('customer_dashboard'))  # Customers go to customer dashboard
     if user.is_admin_role:
         return redirect(url_for('admin_dashboard'))  # Admin/super_admin: admin-only view
+
+    if request.method == 'POST':
+        user.bank_name = request.form.get('bank_name', '').strip() or None
+        user.bank_account_number = request.form.get('bank_account_number', '').strip() or None
+        user.bank_ifsc = request.form.get('bank_ifsc', '').strip().upper() or None
+        db.session.commit()
+        flash('Bank details updated', 'success')
+        return redirect(url_for('dashboard'))
     
     team_count = len(user.get_all_descendants())
     direct_count = user.get_team_count()
@@ -1567,16 +1656,14 @@ def retail_checkout_prepare_pending():
     
     if not all([full_name, phone, email, shipping_address]) or assigned_member_raw == '':
         return jsonify({'error': 'Please fill all fields'}), 400
-    
-    assigned_member_id = None
-    if assigned_member_raw != 'none':
-        try:
-            assigned_member_id = int(assigned_member_raw)
-        except (TypeError, ValueError):
-            return jsonify({'error': 'Invalid sales member selected'}), 400
-        assigned_member = User.query.filter_by(id=assigned_member_id, user_role='user', user_status='active').first()
-        if not assigned_member:
-            return jsonify({'error': 'Invalid sales member selected'}), 400
+
+    try:
+        assigned_member_id = int(assigned_member_raw)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid sales member selected'}), 400
+    assigned_member = User.query.filter_by(id=assigned_member_id, user_role='user', user_status='active').first()
+    if not assigned_member:
+        return jsonify({'error': 'Invalid sales member selected'}), 400
     
     session['retail_checkout_data'] = {
         'product_id': product_id,
@@ -1691,8 +1778,7 @@ def retail_checkout_verify_payment():
     
     # Calculate and add savings points
     savings_account = get_or_create_savings_account(customer.id)
-    order_total = product.price * order.quantity
-    points_earned = int(round(order_total * SAVINGS_POINT_RATE))
+    points_earned = max((product.savings_point or 0) * order.quantity, 0)
     savings_account.current_points += points_earned
     savings_account.lifetime_points += points_earned
     
@@ -2098,6 +2184,33 @@ def my_commissions():
     commissions = Commission.query.filter_by(user_id=user.id).order_by(Commission.created_at.desc()).all()
     return render_template('my_commissions.html', commissions=commissions)
 
+@app.route('/commission-statement')
+def commission_statement():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user = User.query.get(session['user_id'])
+    if not user or user.is_admin_role:
+        return redirect(url_for('admin_dashboard'))
+    entries = CommissionLedger.query.filter_by(user_id=user.id).order_by(
+        CommissionLedger.commission_date.asc(), CommissionLedger.id.asc()
+    ).all()
+    running_pending_balance = 0
+    total_paid = 0
+    current_outstanding_balance = 0
+    for entry in entries:
+        if (entry.status or 'Pending') == 'Paid':
+            total_paid += entry.commission_amount or 0
+        else:
+            running_pending_balance += entry.commission_amount or 0
+        entry.running_pending_balance = running_pending_balance
+    current_outstanding_balance = running_pending_balance
+    return render_template(
+        'commission_statement.html',
+        entries=entries,
+        total_paid=total_paid,
+        current_outstanding_balance=current_outstanding_balance
+    )
+
 @app.route('/my-team')
 def my_team():
     if 'user_id' not in session:
@@ -2395,7 +2508,8 @@ def migrate_db():
     user_cols = [('user_level', 'INTEGER DEFAULT 1'), ('is_admin', 'INTEGER DEFAULT 0'), ('user_role', "VARCHAR(20) DEFAULT 'user'"),
         ('phone', 'VARCHAR(20)'), ('address', 'VARCHAR(255)'), ('user_status', "VARCHAR(20) DEFAULT 'active'"),
         ('assigned_member_id', 'INTEGER'), ('membership_status', "VARCHAR(20) DEFAULT 'active'"),
-        ('activated_at', 'DATETIME')]
+        ('activated_at', 'DATETIME'), ('bank_name', 'VARCHAR(120)'), ('bank_account_number', 'VARCHAR(50)'),
+        ('bank_ifsc', 'VARCHAR(20)')]
     for col, def_sql in user_cols:
         try:
             with db.engine.connect() as conn:
@@ -2428,7 +2542,7 @@ def migrate_db():
                     conn.execute(text(f"ALTER TABLE category ADD COLUMN {col} {def_sql}"))
             except Exception:
                 pass
-    for col, def_sql in [('category_id', 'INTEGER'), ('stock_quantity', 'INTEGER'), ('sku', 'VARCHAR(50)'), ('weight', 'REAL'), ('dimensions', 'VARCHAR(100)'), ('member_discount_percent', 'REAL DEFAULT 0')]:
+    for col, def_sql in [('category_id', 'INTEGER'), ('stock_quantity', 'INTEGER'), ('sku', 'VARCHAR(50)'), ('weight', 'REAL'), ('dimensions', 'VARCHAR(100)'), ('member_discount_percent', 'REAL DEFAULT 0'), ('savings_point', 'INTEGER DEFAULT 0')]:
         try:
             with db.engine.connect() as conn:
                 conn.execute(text(f"SELECT {col} FROM product LIMIT 1"))
@@ -2531,6 +2645,8 @@ def migrate_db():
             if total > 0:
                 w.total_earnings = total
                 w.available_balance = total
+    for comm in Commission.query.filter(Commission.status != 'reversed').all():
+        ensure_commission_ledger_entry(comm)
     db.session.commit()
 
 def has_sales_users():
@@ -2637,11 +2753,22 @@ def admin_user(user_id):
                     db.session.commit()
                     log_activity(admin_user.id, f'Reset password for user: {user.full_name}', 'user', user.id)
                     flash('Password reset', 'success')
+        elif action == 'mark_purchase_requirement_completed':
+            if not user.is_sales_user:
+                flash('This action is available only for sales members.', 'error')
+            elif activate_membership_network(user):
+                log_activity(admin_user.id, f'Marked purchase requirement completed: {user.full_name}', 'user', user.id)
+                flash('Membership activated for member, upline, and downline.', 'success')
+            else:
+                flash('Member, upline, and downline are already active.', 'success')
         elif action == 'update':
             user.full_name = request.form.get('full_name', user.full_name)
             user.email = request.form.get('email', user.email)
             user.phone = request.form.get('phone') or None
             user.address = request.form.get('address') or None
+            user.bank_name = request.form.get('bank_name') or None
+            user.bank_account_number = request.form.get('bank_account_number') or None
+            user.bank_ifsc = (request.form.get('bank_ifsc') or '').upper() or None
             if user.is_sales_user:
                 lvl = request.form.get('user_level', type=int)
                 if lvl and 1 <= lvl <= 10:
@@ -2803,6 +2930,65 @@ def admin_commissions():
     return render_template('admin/commissions.html', commissions=commissions,
         is_super_admin=user.is_super_admin, total_comm=total_comm, commission_summary=commission_summary)
 
+@app.route('/admin/commission-management', methods=['GET', 'POST'])
+@app.route('/admin-commission-management', methods=['GET', 'POST'])
+@require_admin
+def admin_commission_management():
+    admin_user = User.query.get(session['user_id'])
+    if request.method == 'POST':
+        ledger_ids = [lid for lid in request.form.getlist('ledger_ids') if str(lid).strip()]
+        if not ledger_ids:
+            flash('Select at least one pending ledger entry.', 'error')
+            return redirect(url_for('admin_commission_management'))
+        entries = CommissionLedger.query.filter(
+            CommissionLedger.id.in_(ledger_ids),
+            CommissionLedger.status == 'Pending'
+        ).all()
+        if not entries:
+            flash('No pending ledger entries selected.', 'error')
+            return redirect(url_for('admin_commission_management'))
+        paid_at = datetime.utcnow()
+        totals_by_user = {}
+        for entry in entries:
+            entry.status = 'Paid'
+            entry.paid_date = paid_at
+            totals_by_user[entry.user_id] = totals_by_user.get(entry.user_id, 0) + (entry.commission_amount or 0)
+        for user_id, paid_total in totals_by_user.items():
+            wallet = get_or_create_wallet(user_id)
+            wallet.available_balance = max(0, (wallet.available_balance or 0) - paid_total)
+            wallet.withdrawn_balance = (wallet.withdrawn_balance or 0) + paid_total
+        log_activity(
+            admin_user.id,
+            f'Marked commission ledger paid ({len(entries)} entries)',
+            'commission_ledger',
+            None,
+            details=','.join(str(entry.id) for entry in entries)
+        )
+        db.session.commit()
+        flash('Selected commission ledger entries marked as paid.', 'success')
+        return redirect(url_for('admin_commission_management'))
+
+    members = User.query.filter_by(user_role='user').order_by(User.full_name).all()
+    member_ledgers = []
+    for member in members:
+        entries = CommissionLedger.query.filter_by(user_id=member.id).order_by(
+            CommissionLedger.commission_date.desc(), CommissionLedger.id.desc()
+        ).all()
+        if not entries:
+            continue
+        pending_entries = [entry for entry in entries if (entry.status or 'Pending') == 'Pending']
+        total_paid = sum((entry.commission_amount or 0) for entry in entries if (entry.status or 'Pending') == 'Paid')
+        outstanding_commission = sum((entry.commission_amount or 0) for entry in pending_entries)
+        member_ledgers.append({
+            'member': member,
+            'entries': entries,
+            'pending_entries': pending_entries,
+            'outstanding_commission': outstanding_commission,
+            'total_paid': total_paid,
+            'pending_entries_count': len(pending_entries),
+        })
+    return render_template('admin/commission_management.html', member_ledgers=member_ledgers)
+
 @app.route('/admin/wallets')
 @app.route('/admin-wallets')
 @require_super_admin
@@ -2928,6 +3114,7 @@ def admin_product_add():
         name = request.form.get('name', '').strip()
         price = request.form.get('price', type=float)
         member_discount_percent = request.form.get('member_discount_percent', type=float)
+        savings_point = request.form.get('savings_point', type=int)
         category_id = request.form.get('category_id', type=int)
         description = request.form.get('description', '')
         stock_quantity = request.form.get('stock_quantity', type=int)
@@ -2936,7 +3123,10 @@ def admin_product_add():
         dimensions = request.form.get('dimensions', '')
         if member_discount_percent is None:
             member_discount_percent = 0
+        if savings_point is None:
+            savings_point = 0
         member_discount_percent = min(max(member_discount_percent, 0), 100)
+        savings_point = max(savings_point, 0)
         if not name or price is None:
             flash('Name and price required', 'error')
             return redirect(url_for('admin_product_add'))
@@ -2955,7 +3145,7 @@ def admin_product_add():
         p = Product(name=name, price=price, description=description or None, image_url=img_path,
             category_id=category_id if category_id else None, stock_quantity=stock_quantity if stock_quantity is not None else None,
             sku=sku or generate_product_sku(), weight=weight if weight else None, dimensions=dimensions or None,
-            member_discount_percent=member_discount_percent)
+            member_discount_percent=member_discount_percent, savings_point=savings_point)
         db.session.add(p)
         db.session.commit()
         log_activity(session['user_id'], f'Created product: {name}', 'product', p.id)
@@ -2972,10 +3162,13 @@ def admin_product_edit(prod_id):
         p.name = request.form.get('name', '').strip() or p.name
         price = request.form.get('price', type=float)
         member_discount_percent = request.form.get('member_discount_percent', type=float)
+        savings_point = request.form.get('savings_point', type=int)
         if price is not None:
             p.price = price
         if member_discount_percent is not None:
             p.member_discount_percent = min(max(member_discount_percent, 0), 100)
+        if savings_point is not None:
+            p.savings_point = max(savings_point, 0)
         p.category_id = request.form.get('category_id', type=int) or None
         p.description = request.form.get('description', '') or None
         p.stock_quantity = request.form.get('stock_quantity', type=int) if request.form.get('stock_quantity') != '' else None

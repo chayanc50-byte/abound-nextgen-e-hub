@@ -19,6 +19,10 @@
             <input type="number" name="member_discount_percent" min="0" max="100" step="0.01" value="{{ product.member_discount_percent if product else 0 }}">
         </div>
         <div class="form-group">
+            <label>Savings Point</label>
+            <input type="number" name="savings_point" min="0" step="1" value="{{ product.savings_point if product else 0 }}">
+        </div>
+        <div class="form-group">
             <label>Category</label>
             <select name="category_id">
                 <option value="">— None —</option>

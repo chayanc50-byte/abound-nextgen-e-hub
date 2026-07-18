@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Commission Management - Abound-E-Hub{% endblock %}
+{% block topbar_title %}Commission Management{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('admin_dashboard') }}">Dashboard</a> > Commission Management{% endblock %}
+{% block content %}
+<div class="admin-page">
+    <h1>Commission Management</h1>
+    <p>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary btn-sm">← Back to Dashboard</a>
+        <a href="{{ url_for('admin_commissions') }}" class="btn btn-secondary btn-sm">View Existing Commission Report</a>
+    </p>
+
+    {% if member_ledgers %}
+        {% for item in member_ledgers %}
+        <div class="quick-actions" style="margin-bottom: 1.5rem;">
+            <h2>{{ item.member.full_name }}</h2>
+            <div class="table-responsive">
+            <table class="admin-table" style="margin-bottom: 1rem;">
+                <thead>
+                    <tr>
+                        <th>Outstanding Commission</th>
+                        <th>Total Paid</th>
+                        <th>Pending Entries</th>
+                        <th>Bank Name</th>
+                        <th>Account Number</th>
+                        <th>IFSC</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>₹{{ "%.2f"|format(item.outstanding_commission or 0) }}</td>
+                        <td>₹{{ "%.2f"|format(item.total_paid or 0) }}</td>
+                        <td>{{ item.pending_entries_count }}</td>
+                        <td>{{ item.member.bank_name or '—' }}</td>
+                        <td>{{ item.member.bank_account_number or '—' }}</td>
+                        <td>{{ item.member.bank_ifsc or '—' }}</td>
+                    </tr>
+                </tbody>
+            </table>
+            </div>
+
+            {% if item.pending_entries %}
+            <form method="POST">
+                <div class="table-responsive">
+                <table class="admin-table" style="margin-bottom: 1rem;">
+                    <thead>
+                        <tr>
+                            <th>Select</th>
+                            <th>Date</th>
+                            <th>Order</th>
+                            <th>Commission Amount</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in item.pending_entries %}
+                        <tr>
+                            <td><input type="checkbox" name="ledger_ids" value="{{ entry.id }}" checked></td>
+                            <td>{{ entry.commission_date.strftime('%Y-%m-%d %H:%M') if entry.commission_date else '—' }}</td>
+                            <td>#{{ entry.order_id }}</td>
+                            <td>₹{{ "%.2f"|format(entry.commission_amount or 0) }}</td>
+                            <td><span class="badge badge-status-{{ (entry.status or 'Pending')|lower }}">{{ entry.status or 'Pending' }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+                <button type="submit" class="btn btn-primary">Mark Commission Paid</button>
+            </form>
+            {% else %}
+            <p class="muted">No pending ledger entries.</p>
+            {% endif %}
+
+            <h3 style="margin-top: 1.25rem;">Payment History</h3>
+            <div class="table-responsive">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Order</th>
+                        <th>Commission Amount</th>
+                        <th>Status</th>
+                        <th>Paid Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in item.entries %}
+                    <tr>
+                        <td>{{ entry.commission_date.strftime('%Y-%m-%d %H:%M') if entry.commission_date else '—' }}</td>
+                        <td>#{{ entry.order_id }}</td>
+                        <td>₹{{ "%.2f"|format(entry.commission_amount or 0) }}</td>
+                        <td><span class="badge badge-status-{{ (entry.status or 'Pending')|lower }}">{{ entry.status or 'Pending' }}</span></td>
+                        <td>{{ entry.paid_date.strftime('%Y-%m-%d %H:%M') if entry.paid_date else '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+    <p class="muted">No commission ledger entries yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

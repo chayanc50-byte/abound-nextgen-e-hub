@@ -5,7 +5,10 @@
 {% block content %}
 <div class="admin-page">
     <h1>Commissions</h1>
-    <p><a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary btn-sm">← Back to Dashboard</a></p>
+    <p>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary btn-sm">← Back to Dashboard</a>
+        <a href="{{ url_for('admin_commission_management') }}" class="btn btn-secondary btn-sm">Commission Management</a>
+    </p>
     <p><strong>Total Commissions:</strong> ₹{{ "%.2f"|format(total_comm or 0) }}</p>
     {% if is_super_admin %}
     <h2>Commission by User</h2>

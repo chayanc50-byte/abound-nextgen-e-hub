@@ -43,7 +43,6 @@
                             <div class="form-group">
                                 <select id="assigned_member_id" name="assigned_member_id" class="input-select" required>
                                     <option value="">Select Sales Member...</option>
-                                    <option value="none">Continue without Sales Member</option>
                                     {% for member in sales_members %}
                                     <option value="{{ member.id }}">{{ member.full_name }} ({{ member.referral_id or 'No Referral ID' }})</option>
                                     {% endfor %}

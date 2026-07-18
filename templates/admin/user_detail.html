@@ -32,6 +32,9 @@
                     {% endfor %}
                 </select>
             </div>
+            <div class="form-group"><label>Bank Name</label><input type="text" name="bank_name" value="{{ user.bank_name or '' }}"></div>
+            <div class="form-group"><label>Account Number</label><input type="text" name="bank_account_number" value="{{ user.bank_account_number or '' }}"></div>
+            <div class="form-group"><label>IFSC</label><input type="text" name="bank_ifsc" value="{{ user.bank_ifsc or '' }}"></div>
             <p><strong>Assigned Parent:</strong> {{ user.parent.full_name if user.parent else '—' }}
                 <a href="{{ url_for('admin_reassign_user', user_id=user.id) }}" class="btn btn-secondary btn-sm" style="margin-left: 0.5rem;">Reassign</a>
             </p>
@@ -45,6 +48,13 @@
             <button type="submit" class="btn btn-primary">Save Changes</button>
         </div>
     </form>
+
+    {% if user.is_sales_user %}
+    <form method="POST" style="margin: 1rem 0;">
+        <input type="hidden" name="action" value="mark_purchase_requirement_completed">
+        <button type="submit" class="btn btn-secondary">Mark Purchase Requirement Completed</button>
+    </form>
+    {% endif %}
 
     {% if current_user.is_super_admin %}
     <hr>

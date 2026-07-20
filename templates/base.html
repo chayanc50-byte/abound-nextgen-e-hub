@@ -98,7 +98,7 @@
                 </a>
             </div>
             <div class="sidebar-accordion" data-menu="system">
-                <div class="sidebar-item accordion-toggle {% if request.endpoint in ['admin_activity_logs','admin_tree_health','admin_recalculate_commission','email_test'] %}active{% endif %}">
+                <div class="sidebar-item accordion-toggle {% if request.endpoint in ['admin_activity_logs','admin_tree_health','admin_recalculate_commission','email_test','admin_terms_management'] %}active{% endif %}">
                     <span class="sidebar-icon">⚙️</span> System
                     <span class="accordion-arrow">▼</span>
                 </div>
@@ -106,6 +106,7 @@
                     <a href="{{ url_for('admin_activity_logs') }}" class="sidebar-subitem {% if request.endpoint == 'admin_activity_logs' %}active{% endif %}">Activity Logs</a>
                     <a href="{{ url_for('admin_tree_health') }}" class="sidebar-subitem {% if request.endpoint == 'admin_tree_health' %}active{% endif %}">Tree Health</a>
                     <a href="{{ url_for('admin_recalculate_commission') }}" class="sidebar-subitem {% if request.endpoint == 'admin_recalculate_commission' %}active{% endif %}">Recalc Commission</a>
+                    <a href="{{ url_for('admin_terms_management') }}" class="sidebar-subitem {% if request.endpoint == 'admin_terms_management' %}active{% endif %}">Terms Management</a>
                     <a href="{{ url_for('email_test') }}" class="sidebar-subitem {% if request.endpoint == 'email_test' %}active{% endif %}">Email Test</a>
                     <a href="{{ url_for('profile_notifications') }}" class="sidebar-subitem {% if request.endpoint == 'profile_notifications' %}active{% endif %}">Notification Settings</a>
                     <a href="{{ url_for('admin_reassign_user') }}" class="sidebar-subitem {% if request.endpoint == 'admin_reassign_user' %}active{% endif %}">Reassign User</a>
@@ -123,12 +124,13 @@
                 </a>
             </div>
             <div class="sidebar-accordion" data-menu="system">
-                <div class="sidebar-item accordion-toggle {% if request.endpoint in ['email_test','admin_reassign_user'] %}active{% endif %}">
+                <div class="sidebar-item accordion-toggle {% if request.endpoint in ['email_test','admin_reassign_user','admin_terms_management'] %}active{% endif %}">
                     <span class="sidebar-icon">⚙️</span> System
                     <span class="accordion-arrow">▼</span>
                 </div>
                 <div class="accordion-content">
                     <a href="{{ url_for('email_test') }}" class="sidebar-subitem {% if request.endpoint == 'email_test' %}active{% endif %}">Email Test</a>
+                    <a href="{{ url_for('admin_terms_management') }}" class="sidebar-subitem {% if request.endpoint == 'admin_terms_management' %}active{% endif %}">Terms Management</a>
                     <a href="{{ url_for('profile_notifications') }}" class="sidebar-subitem {% if request.endpoint == 'profile_notifications' %}active{% endif %}">Notification Settings</a>
                     <a href="{{ url_for('admin_reassign_user') }}" class="sidebar-subitem {% if request.endpoint == 'admin_reassign_user' %}active{% endif %}">Reassign User</a>
                 </div>

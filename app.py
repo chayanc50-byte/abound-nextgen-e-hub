@@ -49,6 +49,34 @@ app.config['RAZORPAY_KEY_SECRET'] = os.environ.get('RAZORPAY_KEY_SECRET', '').st
 SAVINGS_POINT_RATE = 0.10  # 0.1 points per rupee (10 points per ₹100)
 REWARD_THRESHOLD = 5000  # Points needed to be eligible for a reward
 MEMBERSHIP_ACTIVATION_AMOUNT = 4999
+INITIAL_TERMS_VERSION = '1.0'
+INITIAL_TERMS_TEXT = """Distributor Agreement and Policies
+
+Distributor Status
+- Members are independent business operators.
+- They are not employees, partners, agents or representatives of Abound.
+- Members are responsible for their own taxes, expenses, equipment and working hours.
+
+Eligibility
+- Members must be at least 18 years old or the legal age in their jurisdiction.
+- Members must be legally capable of entering into a binding contract.
+
+Single Household Rule
+- Spouses or members of the same household may not operate separate competing downlines.
+- They must operate under one membership account.
+
+Compliance
+- Abound reserves the absolute right to suspend or terminate any membership for deceptive marketing, misleading claims, manipulation of the compensation plan, fraudulent activity or policy violations.
+
+Downline Ownership
+- All genealogy reports, team structures and distributor network information remain the exclusive property of Abound.
+- Members receive a limited license to use this information solely for supporting their Abound business.
+- Exporting, copying or using this information for another business or MLM is prohibited.
+
+Exclusivity
+- Members may not actively promote or work for competing MLM or direct selling organizations while remaining an active Abound member.
+- Members are authorized to promote and sell only Abound products through the Abound network.
+"""
 
 db = SQLAlchemy(app)
 
@@ -686,9 +714,45 @@ class CommissionLedger(db.Model):
     order = db.relationship('Order', backref='commission_ledger_entries')
     commission = db.relationship('Commission', backref=db.backref('ledger_entry', uselist=False))
 
+class TermsVersion(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    version_number = db.Column(db.String(20), nullable=False, unique=True)
+    terms_text = db.Column(db.Text, nullable=False)
+    effective_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    is_active = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class TermsAcceptance(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    terms_version_id = db.Column(db.Integer, db.ForeignKey('terms_version.id'), nullable=False)
+    version_number = db.Column(db.String(20), nullable=False)
+    accepted_at = db.Column(db.DateTime, default=datetime.utcnow)
+    client_ip_address = db.Column(db.String(100), nullable=True)
+    user_agent = db.Column(db.Text, nullable=True)
+    acceptance_method = db.Column(db.String(20), default='Web')
+    user = db.relationship('User', backref='terms_acceptances')
+    terms_version = db.relationship('TermsVersion', backref='acceptances')
+
 def log_activity(admin_id, action, target_type=None, target_id=None, details=None):
     """Record admin activity for audit trail."""
     db.session.add(ActivityLog(admin_id=admin_id, action=action, target_type=target_type, target_id=target_id, details=details))
+
+def get_active_terms_version():
+    return TermsVersion.query.filter_by(is_active=True).order_by(TermsVersion.effective_date.desc(), TermsVersion.id.desc()).first()
+
+def get_terms_acceptance(user_id, terms_version_id):
+    if not user_id or not terms_version_id:
+        return None
+    return TermsAcceptance.query.filter_by(user_id=user_id, terms_version_id=terms_version_id).first()
+
+def requires_terms_acceptance(user):
+    if not user or not user.is_sales_user:
+        return False
+    current_terms = get_active_terms_version()
+    if not current_terms:
+        return False
+    return get_terms_acceptance(user.id, current_terms.id) is None
 
 def require_super_admin(f):
     """Decorator: require super_admin role. Admin cannot access."""
@@ -932,6 +996,19 @@ def check_user_active():
         session.clear()
         flash('Your account is inactive. Please contact administrator.', 'error')
         return redirect(url_for('login'))
+    allowed_terms_endpoints = {
+        'static', 'logout', 'login', 'terms_acceptance', 'accept_current_terms',
+        'pwa_manifest', 'pwa_service_worker', 'download_apk'
+    }
+    if not user or not user.is_sales_user:
+        return
+    if 'terms_must_accept' not in session:
+        current_terms = get_active_terms_version()
+        acceptance = get_terms_acceptance(user.id, current_terms.id) if current_terms else None
+        session['terms_must_accept'] = bool(current_terms and not acceptance)
+        session['accepted_terms_version_id'] = acceptance.terms_version_id if acceptance else None
+    if session.get('terms_must_accept') and request.endpoint not in allowed_terms_endpoints:
+        return redirect(url_for('terms_acceptance'))
 
 # PWA routes (served at root for correct scope)
 @app.route('/manifest.json')
@@ -1120,9 +1197,15 @@ def login():
         session['level_name'] = user.level_name
         session['referral_id'] = user.referral_id or ''
         session['is_admin'] = user.is_admin_role
+        current_terms = get_active_terms_version()
+        acceptance = get_terms_acceptance(user.id, current_terms.id) if current_terms and user.is_sales_user else None
+        session['terms_must_accept'] = bool(user.is_sales_user and current_terms and not acceptance)
+        session['accepted_terms_version_id'] = acceptance.terms_version_id if acceptance else None
         flash('Login successful!', 'success')
         if user.is_admin_role:
             return redirect(url_for('admin_dashboard'))  # Admin/super_admin go to admin panel
+        if session.get('terms_must_accept'):
+            return redirect(url_for('terms_acceptance'))
         return redirect(url_for('dashboard'))
     
     return render_template('login.html')
@@ -1132,6 +1215,53 @@ def logout():
     session.clear()
     flash('You have been logged out', 'info')
     return redirect(url_for('login'))
+
+@app.route('/terms-acceptance')
+def terms_acceptance():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user = User.query.get(session['user_id'])
+    if not user or not user.is_sales_user:
+        return redirect(url_for('dashboard'))
+    current_terms = get_active_terms_version()
+    if not current_terms:
+        session['terms_must_accept'] = False
+        return redirect(url_for('dashboard'))
+    if not requires_terms_acceptance(user):
+        session['terms_must_accept'] = False
+        session['accepted_terms_version_id'] = current_terms.id
+        return redirect(url_for('dashboard'))
+    return render_template('terms_acceptance.html', current_terms=current_terms)
+
+@app.route('/terms-acceptance/accept', methods=['POST'])
+def accept_current_terms():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user = User.query.get(session['user_id'])
+    if not user or not user.is_sales_user:
+        return redirect(url_for('dashboard'))
+    current_terms = get_active_terms_version()
+    if not current_terms:
+        flash('No active Terms & Conditions version found.', 'error')
+        return redirect(url_for('dashboard'))
+    acceptance = get_terms_acceptance(user.id, current_terms.id)
+    if not acceptance:
+        forwarded_for = request.headers.get('X-Forwarded-For', '')
+        client_ip = forwarded_for.split(',')[0].strip() if forwarded_for else request.remote_addr
+        acceptance = TermsAcceptance(
+            user_id=user.id,
+            terms_version_id=current_terms.id,
+            version_number=current_terms.version_number,
+            client_ip_address=client_ip,
+            user_agent=request.headers.get('User-Agent', ''),
+            acceptance_method='Web'
+        )
+        db.session.add(acceptance)
+        db.session.commit()
+    session['terms_must_accept'] = False
+    session['accepted_terms_version_id'] = current_terms.id
+    flash('Terms & Conditions accepted.', 'success')
+    return redirect(url_for('dashboard'))
 
 @app.route('/dashboard', methods=['GET', 'POST'])
 def dashboard():
@@ -2647,6 +2777,13 @@ def migrate_db():
                 w.available_balance = total
     for comm in Commission.query.filter(Commission.status != 'reversed').all():
         ensure_commission_ledger_entry(comm)
+    if TermsVersion.query.count() == 0:
+        db.session.add(TermsVersion(
+            version_number=INITIAL_TERMS_VERSION,
+            terms_text=INITIAL_TERMS_TEXT,
+            effective_date=datetime.utcnow(),
+            is_active=True
+        ))
     db.session.commit()
 
 def has_sales_users():
@@ -2674,6 +2811,59 @@ def admin_dashboard():
         low_stock = sum(1 for p in Product.query.all() if getattr(p, 'stock_quantity', None) is not None and p.stock_quantity <= 5 and p.stock_quantity > 0)
         return render_template('admin/admin_dashboard.html',
             total_orders=total_orders, pending_orders=pending_orders, total_products=total_products, low_stock=low_stock)
+
+@app.route('/admin/terms-management', methods=['GET', 'POST'])
+@app.route('/admin-terms-management', methods=['GET', 'POST'])
+@require_admin
+def admin_terms_management():
+    admin_user = User.query.get(session['user_id'])
+    if request.method == 'POST':
+        action = request.form.get('action', '').strip()
+        if action == 'create':
+            version_number = request.form.get('version_number', '').strip()
+            terms_text = request.form.get('terms_text', '').strip()
+            effective_date_raw = request.form.get('effective_date', '').strip()
+            activate_now = request.form.get('activate_now') == '1'
+            if not version_number or not terms_text:
+                flash('Version number and Terms text are required.', 'error')
+                return redirect(url_for('admin_terms_management'))
+            if TermsVersion.query.filter_by(version_number=version_number).first():
+                flash('Version number already exists.', 'error')
+                return redirect(url_for('admin_terms_management'))
+            effective_date = datetime.utcnow()
+            if effective_date_raw:
+                try:
+                    effective_date = datetime.strptime(effective_date_raw, '%Y-%m-%d')
+                except ValueError:
+                    flash('Invalid effective date.', 'error')
+                    return redirect(url_for('admin_terms_management'))
+            if activate_now:
+                for version in TermsVersion.query.filter_by(is_active=True).all():
+                    version.is_active = False
+            version = TermsVersion(
+                version_number=version_number,
+                terms_text=terms_text,
+                effective_date=effective_date,
+                is_active=activate_now
+            )
+            db.session.add(version)
+            db.session.commit()
+            log_activity(admin_user.id, f'Created Terms version {version_number}', 'terms_version', version.id)
+            flash(f'Terms version {version_number} created.', 'success')
+            return redirect(url_for('admin_terms_management'))
+        if action == 'activate':
+            version_id = request.form.get('version_id', type=int)
+            version = TermsVersion.query.get_or_404(version_id)
+            for row in TermsVersion.query.filter_by(is_active=True).all():
+                row.is_active = False
+            version.is_active = True
+            db.session.commit()
+            log_activity(admin_user.id, f'Activated Terms version {version.version_number}', 'terms_version', version.id)
+            flash(f'Terms version {version.version_number} activated.', 'success')
+            return redirect(url_for('admin_terms_management'))
+    current_version = get_active_terms_version()
+    versions = TermsVersion.query.order_by(TermsVersion.effective_date.desc(), TermsVersion.id.desc()).all()
+    return render_template('admin/terms_management.html', current_version=current_version, versions=versions)
 
 @app.route('/admin/create-first-sales-user', methods=['GET', 'POST'])
 @require_admin

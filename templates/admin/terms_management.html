@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Terms Management - Abound-E-Hub{% endblock %}
+{% block topbar_title %}Terms Management{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('admin_dashboard') }}">Dashboard</a> > Terms Management{% endblock %}
+{% block content %}
+<div class="admin-page">
+    <h1>Terms Management</h1>
+    <p><a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary btn-sm">← Back to Dashboard</a></p>
+
+    <div class="quick-actions" style="margin-bottom: 1.5rem;">
+        <h2>Current Version</h2>
+        {% if current_version %}
+        <p><strong>Version:</strong> {{ current_version.version_number }}</p>
+        <p><strong>Effective Date:</strong> {{ current_version.effective_date.strftime('%Y-%m-%d') if current_version.effective_date else '—' }}</p>
+        <p><strong>Status:</strong> Active</p>
+        <div class="form-group">
+            <label>Terms Text</label>
+            <textarea rows="14" readonly>{{ current_version.terms_text }}</textarea>
+        </div>
+        {% else %}
+        <p class="muted">No active version.</p>
+        {% endif %}
+    </div>
+
+    <div class="quick-actions" style="margin-bottom: 1.5rem;">
+        <h2>Create New Version</h2>
+        <form method="POST" class="login-form" style="max-width: 800px;">
+            <input type="hidden" name="action" value="create">
+            <div class="form-group">
+                <label>Version Number</label>
+                <input type="text" name="version_number" placeholder="e.g. 1.1" required>
+            </div>
+            <div class="form-group">
+                <label>Effective Date</label>
+                <input type="date" name="effective_date">
+            </div>
+            <div class="form-group">
+                <label>Terms Text</label>
+                <textarea name="terms_text" rows="18" required></textarea>
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" name="activate_now" value="1"> Activate this version immediately</label>
+            </div>
+            <button type="submit" class="btn btn-primary">Create Version</button>
+        </form>
+    </div>
+
+    <div class="quick-actions">
+        <h2>Version History</h2>
+        <div class="table-responsive">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Version</th>
+                    <th>Effective Date</th>
+                    <th>Status</th>
+                    <th>Accepted By</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for version in versions %}
+                <tr>
+                    <td>{{ version.version_number }}</td>
+                    <td>{{ version.effective_date.strftime('%Y-%m-%d') if version.effective_date else '—' }}</td>
+                    <td>{{ 'Active' if version.is_active else 'Inactive' }}</td>
+                    <td>{{ version.acceptances|length }}</td>
+                    <td>
+                        {% if not version.is_active %}
+                        <form method="POST" style="display:inline;">
+                            <input type="hidden" name="action" value="activate">
+                            <input type="hidden" name="version_id" value="{{ version.id }}">
+                            <button type="submit" class="btn btn-secondary btn-sm">Activate</button>
+                        </form>
+                        {% else %}
+                        <span class="muted">Current</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="5">
+                        <details>
+                            <summary>View Terms Text</summary>
+                            <div style="white-space: pre-line; padding-top: 0.75rem;">{{ version.terms_text }}</div>
+                        </details>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not versions %}
+                <tr><td colspan="5">No Terms versions available.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

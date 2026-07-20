@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terms & Conditions - Abound-E-Hub</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Poppins', Arial, sans-serif;
+            background: #111827;
+            color: #111827;
+        }
+        .terms-overlay {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: rgba(17, 24, 39, 0.96);
+        }
+        .terms-card {
+            width: 100%;
+            max-width: 900px;
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+        }
+        .terms-card h1 {
+            margin-top: 0;
+        }
+        .terms-meta {
+            color: #6b7280;
+            margin-bottom: 16px;
+        }
+        .terms-scroll {
+            height: 360px;
+            overflow-y: auto;
+            border: 1px solid #d1d5db;
+            border-radius: 12px;
+            padding: 16px;
+            background: #f9fafb;
+            white-space: pre-line;
+            line-height: 1.6;
+        }
+        .terms-actions {
+            margin-top: 20px;
+        }
+        .terms-note {
+            color: #b45309;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+        .terms-checkbox {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+        .terms-submit {
+            border: none;
+            border-radius: 10px;
+            background: #f97316;
+            color: #fff;
+            padding: 12px 18px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .terms-submit:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="terms-overlay">
+        <div class="terms-card">
+            <h1>Terms & Conditions Acceptance Required</h1>
+            <div class="terms-meta">
+                Version {{ current_terms.version_number }} | Effective {{ current_terms.effective_date.strftime('%Y-%m-%d') if current_terms.effective_date else 'N/A' }}
+            </div>
+
+            <div id="terms-scroll" class="terms-scroll">{{ current_terms.terms_text }}</div>
+
+            <div class="terms-actions">
+                <div id="terms-note" class="terms-note">Scroll to the bottom to enable acceptance.</div>
+                <form method="POST" action="{{ url_for('accept_current_terms') }}">
+                    <label class="terms-checkbox">
+                        <input type="checkbox" id="agree-checkbox" disabled>
+                        <span>I Agree to the Terms & Conditions</span>
+                    </label>
+                    <button type="submit" id="accept-btn" class="terms-submit" disabled>Accept & Continue</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        var scrollBox = document.getElementById('terms-scroll');
+        var checkbox = document.getElementById('agree-checkbox');
+        var button = document.getElementById('accept-btn');
+        var note = document.getElementById('terms-note');
+
+        function updateButtonState() {
+            button.disabled = checkbox.disabled || !checkbox.checked;
+        }
+
+        scrollBox.addEventListener('scroll', function() {
+            var atBottom = scrollBox.scrollTop + scrollBox.clientHeight >= scrollBox.scrollHeight - 5;
+            if (atBottom) {
+                checkbox.disabled = false;
+                note.style.display = 'none';
+                updateButtonState();
+            }
+        });
+
+        checkbox.addEventListener('change', updateButtonState);
+    })();
+    </script>
+</body>
+</html>
